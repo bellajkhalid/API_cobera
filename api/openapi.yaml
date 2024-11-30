@@ -1,0 +1,365 @@
+openapi: 3.0.0
+info:
+  title: Matrix Computation API
+  description: API to compute a matrix of double values from input parameters.
+  version: 1.0.0
+servers:
+- url: http://localhost:5000
+  description: Local server
+- url: http://azakan.net:5000
+  description: Remote server
+paths:
+  /AnalyticalSigmaVolatilityCalibration:
+    post:
+      summary: Compute a matrix from input parameters
+      description: Takes various input parameters and returns computed values.
+      operationId: volatility_densityPOST
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyticalSigmaVolatilityCalibration_Input'
+        required: true
+      responses:
+        "200":
+          description: Successful computation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalyticalSigmaVolatilityCalibration_Output'
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      x-swagger-router-controller: Default
+  /test:
+    get:
+      summary: Retrieve test data
+      description: Returns a predefined array of JSON objects for testing purposes.
+      operationId: testGET
+      responses:
+        "200":
+          description: Successful retrieval of test data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalyticalSigmaVolatilityCalibration_Output'
+      x-swagger-router-controller: Default
+  /api/volatility_asv:
+    get:
+      summary: Get volatility smile and density data
+      operationId: updateVolatilityData_asv
+      x-swagger-router-controller: Default
+      parameters:
+        - name: fwd
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 1.0
+        - name: time
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.333
+        - name: ctrl_p
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.2
+        - name: ctrl_c
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.2
+        - name: atm
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.1929
+        - name: skew
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.02268
+        - name: smile
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.003
+        - name: put
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.0384
+        - name: call
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.0001
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolatilityData'
+    post:
+      summary: Update volatility model data
+      operationId: updateVolatilityData
+      x-swagger-router-controller: Default
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fwd, time, ctrl_p, ctrl_c, atm, skew, smile, put, call]
+              properties:
+                fwd:
+                  type: number
+                  default: 1.0
+                time:
+                  type: number
+                  default: 0.333
+                ctrl_p:
+                  type: number
+                  default: 0.2
+                ctrl_c:
+                  type: number
+                  default: 0.2
+                atm:
+                  type: number
+                  default: 0.1929
+                skew:
+                  type: number
+                  default: 0.02268
+                smile:
+                  type: number
+                  default: 0.003
+                put:
+                  type: number
+                  default: 0.0384
+                call:
+                  type: number
+                  default: 0.0001
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolatilityData'
+        '400':
+          description: Invalid input
+  /api/volatility_svi:
+    get:
+      summary: Get volatility smile and density data for SVI model
+      operationId: updateVolatilityData_svi
+      x-swagger-router-controller: Default
+      parameters:
+        - name: fwd
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 1.0
+        - name: time
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.333
+        - name: b
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.1
+        - name: m
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.01
+        - name: sigma
+          in: query
+          required: true
+          schema:
+            type: number
+            default: 0.4
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolatilityData'
+  
+    post:
+      summary: Update volatility model data for SVI model
+      operationId: updateVolatilityData_svi
+      x-swagger-router-controller: Default
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fwd, time, b, m, sigma]
+              properties:
+                fwd:
+                  type: number
+                  default: 1.0
+                time:
+                  type: number
+                  default: 0.333
+                b:
+                  type: number
+                  default: 0.1
+                m:
+                  type: number
+                  default: 0.01
+                sigma:
+                  type: number
+                  default: 0.4
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolatilityData'
+        '400':
+          description: Invalid input
+components:
+  schemas:
+    AnalyticalSigmaVolatilityCalibration_Input:
+      type: object
+      required:
+        - n
+        - spot
+        - expiry
+        - r
+        - q
+        - beta
+        - rho
+        - volvol
+        - computationType
+      properties:
+        n:
+          type: integer
+          description: Number of points
+        spot:
+          type: number
+          format: float
+          description: Spot price
+        expiry:
+          type: number
+          format: float
+          description: Time to expiry
+        r:
+          type: number
+          format: float
+          description: Risk-free interest rate
+        q:
+          type: number
+          format: float
+          description: Dividend yield
+        beta:
+          type: number
+          format: float
+          description: Beta parameter
+        rho:
+          type: number
+          format: float
+          description: Rho parameter
+        volvol:
+          type: number
+          format: float
+          description: Volatility of volatility
+        computationType:
+          type: string
+          description: Type of computation to perform (e.g. density, volatility, etc.)
+      example:
+        n: 400
+        spot: 2273.684211
+        expiry: 1.0
+        r: 0.003
+        q: 0.0022
+        beta: 0.4158
+        rho: 0.2256
+        volvol: 0.2
+        computationType: "volatility"
+    AnalyticalSigmaVolatilityCalibration_Output:
+      type: object
+      properties:
+        key:
+          type: number
+          format: float
+          description: Input value (e.g., strike price)
+        value:
+          type: number
+          format: float
+          description: AnalyticalSigmaVolatilityCalibration_d result
+      required:
+        - key
+        - value
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+      required:
+        - message
+    VolatilityData:
+      type: object
+      required: [initial, current]
+      properties:
+        initial:
+          type: object
+          required: [strikes, vols, density]
+          properties:
+            strikes:
+              type: array
+              items:
+                type: number
+            vols:
+              type: array
+              items:
+                type: number
+            density:
+              type: array
+              items:
+                type: number
+        current:
+          type: object
+          required: [strikes, vols, density]
+          properties:
+            strikes:
+              type: array
+              items:
+                type: number
+            vols:
+              type: array
+              items:
+                type: number
+            density:
+              type: array
+              items:
+                type: number

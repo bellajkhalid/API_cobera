@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Volatility Model Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.1/plotly.min.js"></script>
+    <style>
+        .container {
+            width: 90%;
+            max-width: 1400px;
+            margin: 20px auto;
+            font-family: Arial, sans-serif;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .control-group {
+            margin: 10px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .slider-container {
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #eee;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .slider-container:hover {
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        label {
+            display: inline-block;
+            width: 80px;
+            font-weight: 500;
+            color: #333;
+        }
+        input[type="range"] {
+            width: 150px;
+            vertical-align: middle;
+            transition: all 0.2s ease;
+        }
+        input[type="range"]:hover {
+            opacity: 0.8;
+        }
+        .value-display {
+            display: inline-block;
+            width: 60px;
+            text-align: right;
+            margin-left: 10px;
+            font-family: monospace;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+        .value-display.changed {
+            color: #2980b9;
+            font-weight: bold;
+        }
+        .graphs {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .graph {
+            flex: 1;
+            min-width: 600px;
+            height: 450px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .button-container {
+            margin: 15px 0;
+            text-align: right;
+            padding: 0 20px;
+        }
+        .reset-button {
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .reset-button:hover {
+            background-color: #34495e;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .reset-button:active {
+            transform: translateY(1px);
+        }
+        .reset-button svg {
+            width: 16px;
+            height: 16px;
+        }
+        .tooltip {
+            position: absolute;
+            background: #2c3e50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+        }
+        .slider-container:hover .tooltip {
+            opacity: 1;
+        }
+        .reset-button.loading {
+        position: relative;
+        pointer-events: none;
+        opacity: 0.7;
+    }
+
+    .reset-button.loading svg {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .graphs.loading {
+        position: relative;
+    }
+
+    .graphs.loading::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 18px;
+        color: #2c3e50;
+    }    
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Volatility Model Visualization</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <div class="slider-container">
+                    <span class="tooltip">Forward price (default: 1.0)</span>
+                    <label>Forward:</label>
+                    <input type="range" id="fwd" min="0.5" max="2" step="0.01" value="1.0">
+                    <span id="fwdValue" class="value-display">1.00</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Time to expiry (default: 0.333)</span>
+                    <label>Time:</label>
+                    <input type="range" id="time" min="0.1" max="1" step="0.001" value="0.333">
+                    <span id="timeValue" class="value-display">0.333</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Control parameter P (default: 0.2)</span>
+                    <label>Ctrl P:</label>
+                    <input type="range" id="ctrl_p" min="0.05" max="0.5" step="0.01" value="0.2">
+                    <span id="ctrl_pValue" class="value-display">0.20</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="slider-container">
+                    <span class="tooltip">Control parameter C (default: 0.2)</span>
+                    <label>Ctrl C:</label>
+                    <input type="range" id="ctrl_c" min="0.05" max="0.5" step="0.01" value="0.2">
+                    <span id="ctrl_cValue" class="value-display">0.20</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">At-the-money volatility (default: 0.1929)</span>
+                    <label>ATM:</label>
+                    <input type="range" id="atm" min="0.05" max="0.5" step="0.0001" value="0.1929">
+                    <span id="atmValue" class="value-display">0.1929</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Skew parameter (default: 0.02268)</span>
+                    <label>Skew:</label>
+                    <input type="range" id="skew" min="-0.1" max="0.1" step="0.00001" value="0.02268">
+                    <span id="skewValue" class="value-display">0.02268</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <div class="slider-container">
+                    <span class="tooltip">Smile parameter (default: 0.003)</span>
+                    <label>Smile:</label>
+                    <input type="range" id="smile" min="-0.01" max="0.01" step="0.0001" value="0.003">
+                    <span id="smileValue" class="value-display">0.0030</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Put parameter (default: 0.0384)</span>
+                    <label>Put:</label>
+                    <input type="range" id="put" min="0" max="0.1" step="0.0001" value="0.0384">
+                    <span id="putValue" class="value-display">0.0384</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Call parameter (default: 0.0001)</span>
+                    <label>Call:</label>
+                    <input type="range" id="call" min="0" max="0.01" step="0.0001" value="0.0001">
+                    <span id="callValue" class="value-display">0.0001</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-container">
+            <button onclick="window.location.reload()" class="reset-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                    <path d="M3 3v5h5"/>
+                </svg>
+                Reset to Default Values
+            </button>
+        </div>
+
+        <div class="graphs">
+            <div id="volatilityGraph" class="graph"></div>
+            <div id="densityGraph" class="graph"></div>
+        </div>
+    </div>
+
+    <script>
+        const defaultValues = {
+            fwd: 1.0,
+            time: 0.333,
+            ctrl_p: 0.2,
+            ctrl_c: 0.2,
+            atm: 0.1929,
+            skew: 0.02268,
+            smile: 0.003,
+            put: 0.0384,
+            call: 0.0001
+        };
+
+        function getMainChartOptions(data, chartType) {
+            const traces = [];
+            
+            if (chartType === 'volatility') {
+                traces.push({
+                    x: data.initial.strikes,
+                    y: data.initial.vols,
+                    name: 'Initial Volatility',
+                    mode: 'lines',
+                    line: {
+                        color: '#2ecc71',
+                        width: 2,
+                        dash: 'dash'
+                    }
+                });
+                
+                traces.push({
+                    x: data.current.strikes,
+                    y: data.current.vols,
+                    name: 'Current Volatility',
+                    mode: 'lines',
+                    line: {
+                        color: '#3498db',
+                        width: 2
+                    }
+                });
+            } else {
+                traces.push({
+                    x: data.initial.strikes,
+                    y: data.initial.density,
+                    name: 'Initial Density',
+                    mode: 'lines',
+                    line: {
+                        color: '#e74c3c',
+                        width: 2,
+                        dash: 'dash'
+                    }
+                });
+                
+                traces.push({
+                    x: data.current.strikes,
+                    y: data.current.density,
+                    name: 'Current Density',
+                    mode: 'lines',
+                    line: {
+                        color: '#9b59b6',
+                        width: 2
+                    }
+                });
+            }
+
+            return {
+                data: traces,
+                layout: {
+                    title: {
+                        text: chartType === 'volatility' ? 'Volatility Smile' : 'Density Distribution',
+                        font: {
+                            family: 'Arial, sans-serif',
+                            size: 24,
+                            color: '#2c3e50'
+                        }
+                    },
+                    showlegend: true,
+                    legend: {
+                        x: 0.05,
+                        y: 0.95,
+                        bgcolor: 'rgba(255, 255, 255, 0.9)',
+                        bordercolor: '#ddd',
+                        borderwidth: 1,
+                        font: {
+                            family: 'Arial, sans-serif',
+                            size: 12,
+                            color: '#666'
+                        }
+                    },
+                    xaxis: {
+                        title: {
+                            text: 'Strike',
+                            font: {
+                                family: 'Arial, sans-serif',
+                                size: 14,
+                                color: '#666'
+                            }
+                        },
+                        gridcolor: '#eee',
+                        zerolinecolor: '#666',
+                        zerolinewidth: 1
+                    },
+                    yaxis: {
+                        title: {
+                            text: chartType === 'volatility' ? 'Implied Volatility' : 'Density',
+                            font: {
+                                family: 'Arial, sans-serif',
+                                size: 14,
+                                color: '#666'
+                            }
+                        },
+                        gridcolor: '#eee',
+                        zerolinecolor: '#666',
+                        zerolinewidth: 1
+                    },
+                    plot_bgcolor: 'white',
+                    paper_bgcolor: 'white',
+                    margin: { t: 60, r: 30, b: 60, l: 60 },
+                    hovermode: 'closest',
+                    hoverlabel: {
+                        bgcolor: 'white',
+                        font: { family: 'Arial, sans-serif' }
+                    }
+                },
+                config: {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToAdd: [
+                        'drawline',
+                        'drawopenpath',
+                        'drawclosedpath',
+                        'drawcircle',
+                        'drawrect',
+                        'eraseshape'
+                    ],
+                    modeBarButtonsToRemove: ['lasso2d'],
+                    toImageButtonOptions: {
+                        format: 'png',
+                        filename: `volatility_${chartType}`,
+                        height: 800,
+                        width: 1200,
+                        scale: 2
+                    }
+                }
+            };
+        }
+
+        const controls = ['fwd', 'time', 'ctrl_p', 'ctrl_c', 'atm', 'skew', 'smile', 'put', 'call'];
+        function resetToDefault() {
+    // Recharge la page complètement
+    window.location.reload();
+}
+        function updateValueDisplay(control, value, defaultValue) {
+            const displayElement = document.getElementById(`${control}Value`);
+            const formattedValue = parseFloat(value).toFixed(
+                control === 'time' ? 3 : 4
+            );
+            displayElement.textContent = formattedValue;
+            
+            if (Math.abs(parseFloat(value) - defaultValue) > 1e-10) {
+                displayElement.classList.add('changed');
+            } else {
+                displayElement.classList.remove('changed');
+            }
+        }
+        
+        async function updateGraphs() {
+            const params = {};
+            controls.forEach(control => {
+                const value = document.getElementById(control).value;
+                params[control] = value;
+                updateValueDisplay(control, value, defaultValues[control]);
+            });
+
+            try {
+                const queryString = Object.entries(params)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join('&');
+
+                const response = await fetch(`/api/volatility_asv?${queryString}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                
+                const data = await response.json();
+
+                // Plot volatility smile
+                const volOptions = getMainChartOptions(data, 'volatility');
+                await Plotly.newPlot('volatilityGraph', 
+                    volOptions.data, 
+                    volOptions.layout, 
+                    volOptions.config
+                );
+
+                // Plot density
+                const densOptions = getMainChartOptions(data, 'density');
+                await Plotly.newPlot('densityGraph', 
+                    densOptions.data, 
+                    densOptions.layout, 
+                    densOptions.config
+                );
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        // Add event listeners
+        controls.forEach(control => {
+            document.getElementById(control).addEventListener('input', updateGraphs);
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            Plotly.Plots.resize('volatilityGraph');
+            Plotly.Plots.resize('densityGraph');
+        });
+
+        // Initial plot
+        window.addEventListener('load', updateGraphs);
+    </script>
+</body>
+</html>
