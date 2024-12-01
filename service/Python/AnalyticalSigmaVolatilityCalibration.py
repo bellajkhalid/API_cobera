@@ -2,7 +2,7 @@
 import json
 import numpy as np
 import sys
-from xsigmamodules.Util import analyticalSigmaVolatility, blackScholes
+from xsigmamodules.Util import analyticalSigmaVolatility, blackScholes, sigmaVolatilityInspired
 from xsigmamodules.util.numpy_support import xsigmaToNumpy, numpyToXsigma
 from volatilityDensityModel import calculate_vols_and_density, generate_sample_data
 def density(obj, strikes, spot, expiry):
@@ -70,7 +70,7 @@ def main():
         strikes = np.linspace(1800, 2700, num_points)
         obj.asv(numpyToXsigma(vols), numpyToXsigma(strikes))
 
-        volatility_smile = {
+        volatility_asv = {
             "calibration_strikes": calibration_strikes.tolist(),
             "bid_values": bid_values.tolist(),
             "ask_values": ask_values.tolist(),
@@ -78,7 +78,28 @@ def main():
             "strikes": strikes.tolist(),
             "vols": vols.tolist()
         }
+        #********************************************************************************
+        initial_values = {
+            "fwd": 1,  # Midpoint of strike range
+            "time": 0.333,
+            "b": 0.1,
+            "m": 0.01,
+            "sigma": 0.4,
+        }
+        obj_svi = sigmaVolatilityInspired(spot, initial_values["b"], initial_values["m"], initial_values["sigma"])
+        obj_svi.calibrate(numpyToXsigma(mid_values), numpyToXsigma(calibration_strikes))
+        obj_svi.svi(numpyToXsigma(vols), numpyToXsigma(strikes))
 
+        
+        volatility_svi = {
+            "calibration_strikes": calibration_strikes.tolist(),
+            "bid_values": bid_values.tolist(),
+            "ask_values": ask_values.tolist(),
+            "mid_values": mid_values.tolist(),
+            "strikes": strikes.tolist(),
+            "vols": vols.tolist()
+        }
+       #********************************************************************************
         response = {
             "status": "success",
             "data": None,
@@ -86,13 +107,13 @@ def main():
             "computationType": computationType
         }
 
-        if computationType == "volatility":
-            response["data"] = volatility_smile
+        if computationType == "volatility_asv":
+            response["data"] = volatility_asv
         elif computationType == "density":
             density_data = density(obj, strikes, spot, expiry)
             response["data"] = density_data
-        elif computationType == "interactive_model":
-            response["data"] = density(obj, strikes, spot, expiry)
+        elif computationType == "volatility_svi":
+            response["data"] = volatility_svi
         else:
             response["status"] = "error"
             response["error"] = f"Invalid computation type: {computationType}"

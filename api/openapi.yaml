@@ -304,7 +304,7 @@ components:
         beta: 0.4158
         rho: 0.2256
         volvol: 0.2
-        computationType: "volatility"
+        computationType: "volatility_asv"
     AnalyticalSigmaVolatilityCalibration_Output:
       type: object
       properties:
