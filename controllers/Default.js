@@ -2,6 +2,80 @@
 
 const utils = require('../utils/writer.js');
 const AnalyticalSigmaVolatilityCalibration = require('../service/AnalyticalSigmaVolatilityCalibration.js');
+const AnalyticalSigmaVolatility = require('../service/AnalyticalSigmaVolatility.js');
+const HartmanWatsonDistribution = require('../service/HW_distribution.js');
+const HjmCalibration = require('../service/hjm.js');
+const MHJMRates = require('../service/LognormalFXWithMHJMRate.js');
+
+// [Previous exports remain the same]
+
+module.exports.LognormalFXWithMHJMRates = async function LognormalFXWithMHJMRates(req, res, next) {
+  console.log('Computing HJM calibration with params:', JSON.stringify(req.query, null, 2));
+  try {
+    const response = await MHJMRates.LognormalFXWithMHJMRates(req, res);
+    // Note: The response is handled within the service function
+  } catch (error) {
+    console.error('Controller error:', error);
+    const status = error.status || 500;
+    const errorResponse = {
+      error: error.message || 'Internal Server Error',
+      status: status,
+      timestamp: new Date().toISOString()
+    };
+    return utils.writeJson(res, errorResponse, status);
+  }
+};
+// [Previous exports remain the same]
+
+module.exports.getHjmCalibration = async function getHjmCalibration(req, res, next) {
+  console.log('Computing HJM calibration with params:', JSON.stringify(req.query, null, 2));
+  try {
+    const response = await HjmCalibration.getHjmCalibration(req, res);
+    // Note: The response is handled within the service function
+  } catch (error) {
+    console.error('Controller error:', error);
+    const status = error.status || 500;
+    const errorResponse = {
+      error: error.message || 'Internal Server Error',
+      status: status,
+      timestamp: new Date().toISOString()
+    };
+    return utils.writeJson(res, errorResponse, status);
+  }
+};
+module.exports.getHartmanWatsonDistribution = async function getHartmanWatsonDistribution(req, res, next) {
+  console.log('Computing Hartman-Watson distribution with params:', JSON.stringify(req.query, null, 2));
+  try {
+    const response = await HartmanWatsonDistribution.getHartmanWatsonDistribution(req, res);
+    // Note: The response is handled within the service function
+  } catch (error) {
+    console.error('Controller error:', error);
+    const status = error.status || 500;
+    const errorResponse = {
+      error: error.message || 'Internal Server Error',
+      status: status,
+      timestamp: new Date().toISOString()
+    };
+    return utils.writeJson(res, errorResponse, status);
+  }
+};
+// Add this new function to the existing exports
+module.exports.getAnalyticalSigmaVolatility = async function getAnalyticalSigmaVolatility(req, res, next) {
+  console.log('Computing analytical sigma volatility with params:', JSON.stringify(req.query, null, 2));
+  try {
+    const response = await AnalyticalSigmaVolatility.getAnalyticalSigmaVolatility(req, res);
+    // Note: The response is handled within the service function
+  } catch (error) {
+    console.error('Controller error:', error);
+    const status = error.status || 500;
+    const errorResponse = {
+      error: error.message || 'Internal Server Error',
+      status: status,
+      timestamp: new Date().toISOString()
+    };
+    return utils.writeJson(res, errorResponse, status);
+  }
+};
 /**
  * Controller for compute POST endpoint
  */

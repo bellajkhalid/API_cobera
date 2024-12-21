@@ -36,6 +36,242 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       x-swagger-router-controller: Default
+  # Add this to the paths section in openapi.yaml
+  /api/hjm:
+    get:
+      summary: Get HJM calibration results
+      operationId: getHjmCalibration
+      x-swagger-router-controller: Default
+      parameters:
+        - name: test
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            enum: [1, 2, 3]
+            description: Test type (1, 2, or 3)
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success, error]
+                  data:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: number
+                  error:
+                    type: string
+                    nullable: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /api/Lognormal_FX_With_MHJM_Rates:
+    get:
+      summary: Get HJM calibration results
+      operationId: LognormalFXWithMHJMRates
+      x-swagger-router-controller: Default
+      parameters:
+        - name: test
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            enum: [1, 2]
+            description: Test type (1, 2)
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success, error]
+                  data:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: number
+                  error:
+                    type: string
+                    nullable: true
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /api/analytical-sigma-volatility:
+    get:
+      summary: Get analytical sigma volatility calculations
+      operationId: getAnalyticalSigmaVolatility
+      x-swagger-router-controller: Default
+      parameters:
+        - name: n
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 200
+        - name: fwd
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 1.0
+        - name: time
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.333
+        - name: ctrl_p
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.2
+        - name: ctrl_c
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.2
+        - name: atm
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.1929
+        - name: skew
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.02268
+        - name: smile
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.00317
+        - name: put
+          in: query
+          required: false
+          schema:
+            type: number
+            default: -0.00213
+        - name: call
+          in: query
+          required: false
+          schema:
+            type: number
+            default: -0.00006
+        - name: Test
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticalSigmaVolatilityResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/hartman_watson_distribution:
+    get:
+      summary: Get Hartman-Watson distribution calculations
+      operationId: getHartmanWatsonDistribution
+      x-swagger-router-controller: Default
+      parameters:
+        - name: n
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 64
+            description: Number of points for calculation
+        - name: t
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.5
+            description: Time parameter
+        - name: size_roots
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 32
+            description: Number of roots for Gaussian quadrature
+        - name: x_0
+          in: query
+          required: false
+          schema:
+            type: number
+            default: -5
+            description: Lower bound of x range
+        - name: x_n
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 3.1
+            description: Upper bound of x range
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HartmanWatsonResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /test:
     get:
       summary: Retrieve test data
@@ -51,6 +287,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/AnalyticalSigmaVolatilityCalibration_Output'
       x-swagger-router-controller: Default
+
   /api/volatility_asv:
     get:
       summary: Get volatility smile and density data
@@ -166,6 +403,7 @@ paths:
                 $ref: '#/components/schemas/VolatilityData'
         '400':
           description: Invalid input
+
   /api/volatility_svi:
     get:
       summary: Get volatility smile and density data for SVI model
@@ -209,7 +447,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VolatilityData'
-  
+    
     post:
       summary: Update volatility model data for SVI model
       operationId: updateVolatilityData_svi
@@ -246,6 +484,7 @@ paths:
                 $ref: '#/components/schemas/VolatilityData'
         '400':
           description: Invalid input
+
 components:
   schemas:
     AnalyticalSigmaVolatilityCalibration_Input:
@@ -305,6 +544,7 @@ components:
         rho: 0.2256
         volvol: 0.2
         computationType: "volatility_asv"
+
     AnalyticalSigmaVolatilityCalibration_Output:
       type: object
       properties:
@@ -319,6 +559,70 @@ components:
       required:
         - key
         - value
+
+    AnalyticalSigmaVolatilityResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+          description: Operation status
+        data:
+          type: object
+          properties:
+            strikes:
+              type: array
+              items:
+                type: number
+              description: Array of strike prices
+            vols:
+              type: array
+              items:
+                type: number
+              description: Array of volatilities
+            vols_origin:
+              type: array
+              items:
+                type: number
+              description: Array of origin volatilities
+        error:
+          type: string
+          nullable: true
+          description: Error message if status is error
+
+    HartmanWatsonResponse:
+      type: object
+      required:
+        - status
+        - data
+        - error
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+          description: Operation status
+        data:
+          type: object
+          required:
+            - x_values
+            - distribution
+          properties:
+            x_values:
+              type: array
+              items:
+                type: number
+              description: Array of x values for the distribution
+              example: [0]
+            distribution:
+              type: array
+              items:
+                type: number
+              description: Array of distribution values
+              example: [0]
+        error:
+          type: string
+          description: Error message if any
+          example: "string"
     Error:
       type: object
       properties:
@@ -327,6 +631,7 @@ components:
           description: Error message
       required:
         - message
+
     VolatilityData:
       type: object
       required: [initial, current]
