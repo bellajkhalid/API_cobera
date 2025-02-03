@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>SVI Volatility Model Visualization</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.1/plotly.min.js"></script>
@@ -10,19 +11,22 @@
             margin: 20px auto;
             font-family: Arial, sans-serif;
         }
+
         .controls {
             margin: 20px 0;
             padding: 20px;
             background: #f8f9fa;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .control-group {
             margin: 10px 0;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 15px;
         }
+
         .slider-container {
             padding: 10px;
             background: white;
@@ -31,24 +35,29 @@
             position: relative;
             transition: all 0.3s ease;
         }
+
         .slider-container:hover {
             background-color: #f8f9fa;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
+
         label {
             display: inline-block;
             width: 80px;
             font-weight: 500;
             color: #333;
         }
+
         input[type="range"] {
             width: 150px;
             vertical-align: middle;
             transition: all 0.2s ease;
         }
+
         input[type="range"]:hover {
             opacity: 0.8;
         }
+
         .value-display {
             display: inline-block;
             width: 60px;
@@ -58,16 +67,19 @@
             color: #666;
             transition: color 0.3s ease;
         }
+
         .value-display.changed {
             color: #2980b9;
             font-weight: bold;
         }
+
         .graphs {
             display: flex;
             gap: 20px;
             flex-wrap: wrap;
             margin-top: 20px;
         }
+
         .graph {
             flex: 1;
             min-width: 600px;
@@ -75,17 +87,20 @@
             background: white;
             border-radius: 8px;
             padding: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             color: #2c3e50;
             margin-bottom: 20px;
         }
+
         .button-container {
             margin: 15px 0;
             text-align: right;
             padding: 0 20px;
         }
+
         .reset-button {
             background-color: #2c3e50;
             color: white;
@@ -100,18 +115,22 @@
             align-items: center;
             gap: 8px;
         }
+
         .reset-button:hover {
             background-color: #34495e;
             transform: translateY(-1px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
+
         .reset-button:active {
             transform: translateY(1px);
         }
+
         .reset-button svg {
             width: 16px;
             height: 16px;
         }
+
         .tooltip {
             position: absolute;
             background: #2c3e50;
@@ -129,24 +148,35 @@
             z-index: 1000;
             margin-bottom: 5px;
         }
+
         .slider-container:hover .tooltip {
             opacity: 1;
         }
+
         .reset-button.loading {
             position: relative;
             pointer-events: none;
             opacity: 0.7;
         }
+
         .reset-button.loading svg {
             animation: spin 1s linear infinite;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
+
         .graphs.loading {
             position: relative;
         }
+
         .graphs.loading::after {
             content: '';
             position: absolute;
@@ -160,13 +190,14 @@
             align-items: center;
             font-size: 18px;
             color: #2c3e50;
-        }    
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>SVI Volatility Model Visualization</h1>
-        
+
         <div class="controls">
             <div class="control-group">
                 <div class="slider-container">
@@ -206,10 +237,10 @@
 
         <div class="button-container">
             <button onclick="window.location.reload()" class="reset-button">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                    <path d="M3 3v5h5"/>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
                 </svg>
                 Reset to Default Values
             </button>
@@ -229,10 +260,108 @@
             m: 0.01,
             sigma: 0.4
         };
+        window.addEventListener('DOMContentLoaded', initializePlots);
+        function initializePlots() {
+            const emptyData = [{
+                x: [],
+                y: [],
+                mode: 'lines',
+                name: 'Initial'
+            }];
 
+            const layout = {
+                title: {
+                    text: 'Loading...',
+                    font: {
+                        family: 'Arial, sans-serif',
+                        size: 24,
+                        color: '#2c3e50'
+                    }
+                },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white'
+            };
+
+            Plotly.newPlot('volatilityGraph', emptyData, layout);
+            Plotly.newPlot('densityGraph', emptyData, layout);
+        }
+
+        // Call initialization on page load
+
+
+        async function updateGraphs() {
+            try {
+                // Show loading state
+                document.querySelector('.graphs').classList.add('loading');
+
+                const params = {};
+                controls.forEach(control => {
+                    const value = document.getElementById(control).value;
+                    params[control] = value;
+                    updateValueDisplay(control, value, defaultValues[control]);
+                });
+
+                console.log('Fetching data with params:', params);
+
+                const queryString = Object.entries(params)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join('&');
+
+                const response = await fetch(`/api/volatility_svi?${queryString}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Received data:', result);
+
+                if (result.status !== 'success' || !result.data) {
+                    throw new Error('Invalid data received from server');
+                }
+
+                const data = result.data;
+
+                // Plot volatility smile
+                const volOptions = getMainChartOptions(data, 'volatility');
+                await Plotly.react('volatilityGraph',
+                    volOptions.data,
+                    volOptions.layout,
+                    volOptions.config
+                );
+
+                // Plot density
+                const densOptions = getMainChartOptions(data, 'density');
+                await Plotly.react('densityGraph',
+                    densOptions.data,
+                    densOptions.layout,
+                    densOptions.config
+                );
+
+            } catch (error) {
+                console.error('Error updating graphs:', error);
+                // Show error in graphs
+                const errorLayout = {
+                    annotations: [{
+                        text: 'Error loading data: ' + error.message,
+                        xref: 'paper',
+                        yref: 'paper',
+                        showarrow: false,
+                        font: {
+                            size: 16,
+                            color: 'red'
+                        }
+                    }]
+                };
+                Plotly.relayout('volatilityGraph', errorLayout);
+                Plotly.relayout('densityGraph', errorLayout);
+            } finally {
+                // Remove loading state
+                document.querySelector('.graphs').classList.remove('loading');
+            }
+        }
         function getMainChartOptions(data, chartType) {
             const traces = [];
-            
+
             if (chartType === 'volatility') {
                 traces.push({
                     x: data.initial.strikes,
@@ -245,7 +374,7 @@
                         dash: 'dash'
                     }
                 });
-                
+
                 traces.push({
                     x: data.current.strikes,
                     y: data.current.vols,
@@ -268,7 +397,7 @@
                         dash: 'dash'
                     }
                 });
-                
+
                 traces.push({
                     x: data.current.strikes,
                     y: data.current.density,
@@ -364,79 +493,45 @@
         }
 
         const controls = ['fwd', 'time', 'b', 'm', 'sigma'];
-        
+
+        controls.forEach(control => {
+            document.getElementById(control).addEventListener('input', updateGraphs);
+        });
+
+        window.addEventListener('resize', () => {
+            Plotly.Plots.resize('volatilityGraph');
+            Plotly.Plots.resize('densityGraph');
+        });
+
         function resetToDefault() {
-            window.location.reload();
+            controls.forEach(control => {
+                const input = document.getElementById(control);
+                input.value = defaultValues[control];
+                updateValueDisplay(control, defaultValues[control], defaultValues[control]);
+            });
+            updateGraphs();
         }
-        
+
+
         function updateValueDisplay(control, value, defaultValue) {
             const displayElement = document.getElementById(`${control}Value`);
             const formattedValue = parseFloat(value).toFixed(
                 control === 'time' ? 3 : 2
             );
             displayElement.textContent = formattedValue;
-            
+
             if (Math.abs(parseFloat(value) - defaultValue) > 1e-10) {
                 displayElement.classList.add('changed');
             } else {
                 displayElement.classList.remove('changed');
             }
         }
-        
-        async function updateGraphs() {
-            const params = {};
-            controls.forEach(control => {
-                const value = document.getElementById(control).value;
-                params[control] = value;
-                updateValueDisplay(control, value, defaultValues[control]);
-            });
 
-            try {
-                const queryString = Object.entries(params)
-                    .map(([key, value]) => `${key}=${value}`)
-                    .join('&');
 
-                const response = await fetch(`/api/volatility_svi?${queryString}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
 
-                // Plot volatility smile
-                const volOptions = getMainChartOptions(data, 'volatility');
-                await Plotly.newPlot('volatilityGraph', 
-                    volOptions.data, 
-                    volOptions.layout, 
-                    volOptions.config
-                );
-
-                // Plot density
-                const densOptions = getMainChartOptions(data, 'density');
-                await Plotly.newPlot('densityGraph', 
-                    densOptions.data, 
-                    densOptions.layout, 
-                    densOptions.config
-                );
-
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            }
-        }
-
-        // Add event listeners
-        controls.forEach(control => {
-            document.getElementById(control).addEventListener('input', updateGraphs);
-        });
-
-    // Handle window resize
-window.addEventListener('resize', () => {
-    Plotly.Plots.resize('volatilityGraph');
-    Plotly.Plots.resize('densityGraph');
-});
-
-// Initial plot
-window.addEventListener('load', updateGraphs);
+        // Initial plot
+        window.addEventListener('load', updateGraphs);
     </script>
 </body>
+
 </html>

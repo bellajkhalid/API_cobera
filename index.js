@@ -9,43 +9,91 @@ const oas3Tools = require('oas3-tools');
 const serverPort = 5000;
 const Port = 'localhost';
 
-// Créer l'application Express
+// Create Express application
 const app = express();
 
-// Configuration swagger
+// Swagger configuration
 const options = {
     routing: {
         controllers: path.join(__dirname, './controllers')
     },
 };
 
-// Créer le middleware Swagger
+// Create Swagger middleware
 const swaggerMiddleware = oas3Tools.expressAppConfig(path.join(__dirname, 'api/openapi.yaml'), options);
 const swaggerApp = swaggerMiddleware.getApp();
 
-// Configuration CORS
+// CORS configuration
 const corsOptions = {
     origin: '*',
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
-// Configuration des templates
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Template configuration
 app.set('views', path.join(__dirname, 'templates'));
 app.engine('html', require('ejs').renderFile);
 app.set('view engine', 'html');
 
-// Route principale pour servir index_interactive.html
+// Main routes
 app.get('/', (req, res) => {
+    res.render('index');  // Main landing page
+});
+
+app.get('/svi', (req, res) => {
     res.render('volatility_svi');
 });
 
-// Intégrer les routes Swagger après la route principale
+app.get('/zabr', (req, res) => {
+    res.render('zabr_analytics');
+});
+
+// Add model-specific routes
+app.get('/zabr/classical', (req, res) => {
+    res.render('zabr_analytics', { 
+        modelType: 'classical',
+        title: 'Classical ZABR Model'
+    });
+});
+
+app.get('/zabr/mixture', (req, res) => {
+    res.render('zabr_analytics', { 
+        modelType: 'mixture',
+        title: 'Mixture ZABR Model'
+    });
+});
+
+app.get('/zabr/pde', (req, res) => {
+    res.render('zabr_analytics', { 
+        modelType: 'pde',
+        title: 'PDE ZABR Model'
+    });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({
+        status: 'error',
+        message: 'Internal Server Error',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+});
+
+// Integrate Swagger routes after main routes
 app.use(swaggerApp);
 
-// Démarrer le serveur
+// Start server
 http.createServer(app).listen(serverPort, Port, function () {
-    console.log(`Server started on port ${serverPort}`);
-    console.log(`Swagger UI available at http://${Port}:${serverPort}/docs`);
-    console.log(`Application available at http://${Port}:${serverPort}`);
+    console.log('Your server is listening on port %d', serverPort);
+    console.log('Swagger-ui is available on http://%s:%d/docs', Port, serverPort);
+    console.log('Main application: http://%s:%d', Port, serverPort);
+    console.log('SVI Visualization: http://%s:%d/svi', Port, serverPort);
+    console.log('ZABR Visualization: http://%s:%d/zabr', Port, serverPort);
+    console.log('ZABR Classical Model: http://%s:%d/zabr/classical', Port, serverPort);
+    console.log('ZABR Mixture Model: http://%s:%d/zabr/mixture', Port, serverPort);
+    console.log('ZABR PDE Model: http://%s:%d/zabr/pde', Port, serverPort);
 });

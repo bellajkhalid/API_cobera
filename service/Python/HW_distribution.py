@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import json
 import numpy as np
@@ -7,95 +9,93 @@ from xsigmamodules.Math import (
     hartman_watson_distribution_type,
 )
 from xsigmamodules.Vectorization import vector, matrix, tensor
-from xsigma.util.numpy_support import xsigmaToNumpy, numpyToXsigma
-from dataclasses import dataclass
-from typing import Dict, List, Union
+from xsigmamodules.util.numpy_support import xsigmaToNumpy, numpyToXsigma
 
-@dataclass
-class CalculationParams:
-    n: int
-    t: float
-    size_roots: int
-    x_0: float
-    x_n: float
-
-    @classmethod
-    def from_argv(cls, argv: List[str]) -> 'CalculationParams':
-        if len(argv) < 6:
-            raise ValueError("Required arguments: n t size_roots x_0 x_n")
-        
-        try:
-            return cls(
-                n=int(argv[1]),
-                t=float(argv[2]),
-                size_roots=int(argv[3]),
-                x_0=float(argv[4]),
-                x_n=float(argv[5])
-            )
-        except ValueError as e:
-            raise ValueError(f"Error parsing arguments: {e}")
-
-def calculate_hartman_watson_data(params: CalculationParams) -> Dict[str, Union[List[float], None]]:
+def calculate_hw_distribution(n, t, size_roots, x_0, x_n):
     try:
-        # Initialize vectors for calculation
-        roots = vector["double"](params.size_roots)
-        w1 = vector["double"](params.size_roots)
-        w2 = vector["double"](params.size_roots)
+        # Create vectors for Gaussian quadrature
+        roots = vector["double"](size_roots)
+        w1 = vector["double"](size_roots)
+        w2 = vector["double"](size_roots)
 
-        # Calculate Gaussian-Kronrod quadrature
-        gaussianQuadrature.gauss_kronrod(params.size_roots, roots, w1, w2)
-        
-        # Create input points array
-        a = np.linspace(params.x_0, params.x_n, params.n)
-        r = numpyToXsigma(a)
-        
+        # Calculate Gaussian quadrature weights and roots
+        gaussianQuadrature.gauss_kronrod(size_roots, roots, w1, w2)
+
+        # Create x values array
+        x_values = np.linspace(x_0, x_n, n)
+        r = numpyToXsigma(x_values)
+
         # Initialize result array
-        b = np.zeros(params.n)
-        result = numpyToXsigma(b)
+        distribution = np.zeros(n)
+        result = numpyToXsigma(distribution)
 
-        # Calculate distribution
+        # Calculate Hartman-Watson distribution
         hartmanWatsonDistribution.distribution(
             result,
-            params.t,
+            t,
             r,
             roots,
             w1,
             hartman_watson_distribution_type.MIXTURE
         )
 
-        # Convert result back to numpy array
-        final_result = xsigmaToNumpy(result)
+        # Convert back to numpy array for output
+        distribution = xsigmaToNumpy(result)
 
-        return {
-            "x_values": a.tolist(),
-            "distribution": final_result.tolist()
-        }
-    except Exception as e:
-        return {
-            "x_values": None,
-            "distribution": None,
-            "error": str(e)
-        }
-
-def main() -> None:
-    try:
-        params = CalculationParams.from_argv(sys.argv)
-        data = calculate_hartman_watson_data(params)
-        
-        response = {
+        # Return results in the expected format
+        output = {
             "status": "success",
-            "data": data,
+            "data": {
+                "x_values": x_values.tolist(),
+                "distribution": distribution.tolist()
+            },
             "error": None
         }
 
+        return output
+
     except Exception as e:
-        response = {
+        return {
             "status": "error",
             "data": None,
             "error": str(e)
         }
 
-    print(json.dumps(response))
+def main():
+    try:
+        # Get command line arguments
+        if len(sys.argv) != 6:
+            raise ValueError("Expected 5 arguments: n, t, size_roots, x_0, x_n")
+
+        n = int(sys.argv[1])
+        t = float(sys.argv[2])
+        size_roots = int(sys.argv[3])
+        x_0 = float(sys.argv[4])
+        x_n = float(sys.argv[5])
+
+        # Validate inputs
+        if n <= 0:
+            raise ValueError("n must be positive")
+        if t <= 0:
+            raise ValueError("t must be positive")
+        if size_roots <= 0:
+            raise ValueError("size_roots must be positive")
+        if x_0 >= x_n:
+            raise ValueError("x_0 must be less than x_n")
+
+        # Calculate distribution
+        result = calculate_hw_distribution(n, t, size_roots, x_0, x_n)
+        
+        # Print result as JSON
+        print(json.dumps(result))
+
+    except Exception as e:
+        print(json.dumps({
+            "status": "error",
+            "data": None,
+            "error": str(e)
+        }))
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

@@ -1,126 +1,198 @@
-
 'use strict';
 
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 const { spawn } = require('child_process');
 
+// Configuration constants with increased timeout
+const PYTHON_CONFIG = {
+  EXECUTABLE: process.platform === 'win32' 
+    ? 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe'
+    : '/usr/local/bin/xsigmapython',
+  SITE_PACKAGES: process.platform === 'win32'
+    ? 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages'
+    : '/usr/local/lib/python3.12/site-packages',
+  DATA_ROOT: process.platform === 'win32'
+    ? 'C:/dev/build_ninja_avx2_python/ExternalData/Testing'
+    : '/usr/local/share/xsigma/data',
+  TIMEOUT_MS: 1200000  // Increased to 1200 seconds
+};
+
+class PythonExecutionError extends Error {
+  constructor(message, status = 500, details = {}) {
+    super(message);
+    this.name = 'PythonExecutionError';
+    this.status = status;
+    this.details = details;
+  }
+}
+
+/**
+ * Validates the Python script existence and permissions
+ */
+async function validatePythonScript(scriptPath) {
+  try {
+    await fs.access(scriptPath, fs.constants.R_OK);
+  } catch (error) {
+    throw new PythonExecutionError(
+      `Python script not found or not readable at: ${scriptPath}`,
+      500,
+      { scriptPath, error: error.message }
+    );
+  }
+}
+
+/**
+ * Creates Python execution environment
+ */
+function createPythonEnvironment(scriptDir) {
+  return {
+    ...process.env,
+    PYTHONPATH: PYTHON_CONFIG.SITE_PACKAGES,
+    XSIGMA_DATA_ROOT: PYTHON_CONFIG.DATA_ROOT,
+    PYTHONUNBUFFERED: '1'
+  };
+}
+
+/**
+ * Executes Python process with the given arguments
+ */
+function executePythonProcess(pythonPath, args, env) {
+  const process = spawn(pythonPath, args, {
+    env,
+    cwd: path.dirname(args[0]),
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+
+  const output = { stdout: '', stderr: '' };
+
+  process.stdout.on('data', (data) => {
+    const str = data.toString();
+    console.log('[Python stdout]:', str);
+    output.stdout += str;
+  });
+
+  process.stderr.on('data', (data) => {
+    const str = data.toString();
+    console.error('[Python stderr]:', str);
+    output.stderr += str;
+  });
+
+  return { process, output };
+}
+
+function parseJsonOutput(output) {
+  const jsonMatch = output.match(/\{[\s\S]*\}/g);
+  if (!jsonMatch) {
+    throw new PythonExecutionError('No valid JSON found in output', 500, { output });
+  }
+  
+  try {
+    return JSON.parse(jsonMatch[jsonMatch.length - 1]);
+  } catch (error) {
+    throw new PythonExecutionError(
+      'Failed to parse Python output',
+      500,
+      { error: error.message, rawOutput: output }
+    );
+  }
+}
+
+/**
+ * Handle requests for the LognormalFXWithMHJMRates service
+ */
 exports.LognormalFXWithMHJMRates = async function(req, res) {
   try {
-    // Extract parameters from request
-    const test = parseInt(req.query.test || '1');
+    console.log('Computing HJM calibration with params:', req.query);
 
-    // Validate parameter
-    if (![1, 2].includes(test)) {
-      const error = new Error('test parameter must be 1, 2');
-      error.status = 400;
-      throw error;
-    }
-
-    // Get absolute paths
+    // Set up paths
     const projectRoot = path.resolve(__dirname, '..');
-    const pythonScriptPath = path.join(projectRoot, 'service', 'Python', 'LognormalFXWithMHJMRates.py');
-    
-    // Verify Python script exists
-    if (!fs.existsSync(pythonScriptPath)) {
-      console.error('Python script not found at:', pythonScriptPath);
-      const error = new Error(`Python script not found at: ${pythonScriptPath}`);
-      error.status = 500;
-      throw error;
+    const pythonScriptPath = path.join(
+      projectRoot,
+      'service',
+      'Python',
+      'LognormalFXWithMHJMRates.py'
+    );
+
+    // Validate script existence
+    await validatePythonScript(pythonScriptPath);
+
+    // Prepare command line arguments
+    const args = [pythonScriptPath];
+    if (req.query.num_paths) {
+      args.push('--num-paths', req.query.num_paths);
+    }
+    if (req.query.volatility) {
+      args.push('--volatility', req.query.volatility);
     }
 
-    // Set up specific Python environment
-    const pythonPath = 'C:\\Program Files\\Python312\\python.exe';
-    const pythonSitePackages = 'C:\\Program Files\\Python312\\Lib\\site-packages';
-    
-    // Set up environment variables
-    const env = {
-      ...process.env,
-      PYTHONPATH: [
-        pythonSitePackages,
-        path.dirname(pythonScriptPath),
-        process.env.PYTHONPATH || ''
-      ].join(path.delimiter),
-      PYTHONUNBUFFERED: '1'
-    };
-
-    console.log('Executing with:');
-    console.log('Python Path:', pythonPath);
-    console.log('Script Path:', pythonScriptPath);
-    console.log('PYTHONPATH:', env.PYTHONPATH);
-    console.log('Working Directory:', path.dirname(pythonScriptPath));
-    console.log('Test Parameter:', test);
-
-    // Create Python process
-    const pythonProcess = spawn(pythonPath, [pythonScriptPath, test.toString()], {
-      env,
-      cwd: path.dirname(pythonScriptPath),
-      stdio: ['pipe', 'pipe', 'pipe']
+    // Log execution details
+    console.log('[Configuration]', {
+      pythonExecutable: PYTHON_CONFIG.EXECUTABLE,
+      scriptPath: pythonScriptPath,
+      pythonPath: PYTHON_CONFIG.SITE_PACKAGES,
+      workingDirectory: path.dirname(pythonScriptPath),
+      arguments: args
     });
 
-    let dataString = '';
-    let errorString = '';
+    // Set up and execute Python process
+    const env = createPythonEnvironment(path.dirname(pythonScriptPath));
+    const { process: pythonProcess, output } = executePythonProcess(
+      PYTHON_CONFIG.EXECUTABLE,
+      args,
+      env
+    );
 
-    pythonProcess.stdout.on('data', (data) => {
-      const output = data.toString();
-      console.log('Python stdout:', output);
-      dataString += output;
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-      const error = data.toString();
-      console.error('Python stderr:', error);
-      errorString += error;
-    });
-
+    // Handle process completion with increased timeout
     await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pythonProcess.kill();
+        reject(new PythonExecutionError(
+          `Python process timed out after ${PYTHON_CONFIG.TIMEOUT_MS}ms`,
+          500
+        ));
+      }, PYTHON_CONFIG.TIMEOUT_MS);
+
       pythonProcess.on('close', (code) => {
-        console.log('Python process exited with code:', code);
+        clearTimeout(timeout);
+        console.log('[Python process] exited with code:', code);
+        
         if (code !== 0) {
-          const error = new Error(
-            `Python process exited with code ${code}\n` +
-            `Error: ${errorString}`
-          );
-          error.status = 500;
-          reject(error);
+          reject(new PythonExecutionError(
+            `Python process exited with code ${code}`,
+            500,
+            { stderr: output.stderr }
+          ));
         } else {
           resolve();
         }
       });
 
       pythonProcess.on('error', (error) => {
-        console.error('Failed to start Python process:', error);
-        error.status = 500;
-        reject(new Error(`Failed to start Python process: ${error.message}`));
+        clearTimeout(timeout);
+        console.error('[Python process] failed to start:', error);
+        reject(new PythonExecutionError(
+          'Failed to start Python process',
+          500,
+          { error: error.message }
+        ));
       });
-
-      // Add timeout
-      setTimeout(() => {
-        pythonProcess.kill();
-        reject(new Error('Python process timed out after 30 seconds'));
-      }, 30000);
     });
 
-    try {
-      // Find the last valid JSON in the output
-      const jsonMatch = dataString.match(/\{[\s\S]*\}/g);
-      if (!jsonMatch) {
-        throw new Error('No valid JSON found in output');
-      }
-      const lastJson = jsonMatch[jsonMatch.length - 1];
-      const result = JSON.parse(lastJson);
-      return res.json(result);
-    } catch (e) {
-      console.error('Failed to parse Python output:', e);
-      console.error('Raw output:', dataString);
-      const error = new Error(`Invalid Python output: ${e.toString()}\nRaw output: ${dataString}`);
-      error.status = 500;
-      throw error;
-    }
+    // Parse and validate results
+    const result = parseJsonOutput(output.stdout);
+    
+    // Return results
+    return res.json(result);
+
   } catch (error) {
-    if (!error.status) {
-      error.status = 500;
-    }
-    throw error;
+    // Ensure consistent error format
+    console.error('[Error]', error);
+    const statusCode = error instanceof PythonExecutionError ? error.status : 500;
+    res.status(statusCode).json({
+      status: 'error',
+      data: null,
+      error: error.message
+    });
   }
 };

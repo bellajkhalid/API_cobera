@@ -1,91 +1,99 @@
-// AnalyticalSigmaVolatilityCalibration.js
 'use strict';
 
 const path = require('path');
 const { spawn } = require('child_process');
 
+const XSIGMA_PYTHON = process.env.XSIGMA_PYTHON || 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe';
+const PYTHONPATH = process.env.PYTHONPATH || 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages';
+const XSIGMA_DATA_ROOT = process.env.XSIGMA_DATA_ROOT || 'C:/dev/build_ninja_avx2_python/ExternalData/Testing';
+
+const DEFAULT_PARAMS = {
+  1: {
+    fwd: 2245.0656707892695,
+    time: 1.0,
+    ctrl_p: 0.2,
+    ctrl_c: 0.2,
+    atm: 1.1,
+    skew: 3.5,
+    smile: 17,
+    put: 0.7,
+    call: 0.06
+  },
+  default: {
+    fwd: 1.0,
+    time: 0.333,
+    ctrl_p: 0.2,
+    ctrl_c: 0.2,
+    atm: 0.1929,
+    skew: 0.02268,
+    smile: 0.00317,
+    put: -0.00213,
+    call: -0.00006
+  }
+};
 
 exports.getAnalyticalSigmaVolatility = async function(req, res) {
   try {
-    // Extract parameters from request with defaults
+    const test = parseInt(req.query.Test || '1');
+    const defaultSet = DEFAULT_PARAMS[test] || DEFAULT_PARAMS.default;
+
     const params = {
       n: parseInt(req.query.n || '200'),
-      fwd: parseFloat(req.query.fwd || '1.0'),
-      time: parseFloat(req.query.time || '0.333'),
-      ctrl_p: parseFloat(req.query.ctrl_p || '0.2'),
-      ctrl_c: parseFloat(req.query.ctrl_c || '0.2'),
-      atm: parseFloat(req.query.atm || '0.1929'),
-      skew: parseFloat(req.query.skew || '0.02268'),
-      smile: parseFloat(req.query.smile || '0.00317'),
-      put: parseFloat(req.query.put || '-0.00213'),
-      call: parseFloat(req.query.call || '-0.00006'),
-      Test: parseInt(req.query.Test || '1')
+      fwd: parseFloat(req.query.fwd || defaultSet.fwd),
+      time: parseFloat(req.query.time || defaultSet.time),
+      ctrl_p: parseFloat(req.query.ctrl_p || defaultSet.ctrl_p),
+      ctrl_c: parseFloat(req.query.ctrl_c || defaultSet.ctrl_c),
+      atm: parseFloat(req.query.atm || defaultSet.atm),
+      skew: parseFloat(req.query.skew || defaultSet.skew),
+      smile: parseFloat(req.query.smile || defaultSet.smile),
+      put: parseFloat(req.query.put || defaultSet.put),
+      call: parseFloat(req.query.call || defaultSet.call),
+      Test: test
     };
 
-    // Validate all parameters are numbers
-    for (const [key, value] of Object.entries(params)) {
-      if (isNaN(value)) {
-        throw new Error(`Invalid numeric value for parameter: ${key}`);
-      }
-    }
+    Object.entries(params).forEach(([key, value]) => {
+      if (isNaN(value)) throw new Error(`Invalid value for ${key}`);
+    });
 
-    // Create Python process
     const pythonScriptPath = path.join(__dirname, './Python/AnalyticalSigmaVolatility.py');
-    const pythonProcess = spawn('python', [
-      pythonScriptPath,
-      params.n.toString(),
-      params.fwd.toString(),
-      params.time.toString(),
-      params.ctrl_p.toString(),
-      params.ctrl_c.toString(),
-      params.atm.toString(),
-      params.skew.toString(),
-      params.smile.toString(),
-      params.put.toString(),
-      params.call.toString(),
-      params.Test.toString()
-    ]);
+    const env = { ...process.env, PYTHONPATH, XSIGMA_DATA_ROOT, PYTHONUNBUFFERED: '1' };
+    const args = Object.values(params).map(String);
 
-    let dataString = '';
-    let errorString = '';
-
-    pythonProcess.stdout.on('data', (data) => {
-      dataString += data.toString();
+    const pythonProcess = spawn(XSIGMA_PYTHON, [pythonScriptPath, ...args], {
+      env,
+      stdio: ['pipe', 'pipe', 'pipe']
     });
 
-    pythonProcess.stderr.on('data', (data) => {
-      errorString += data.toString();
-    });
+    let [dataString, errorString] = ['', ''];
+    pythonProcess.stdout.on('data', (data) => dataString += data.toString());
+    pythonProcess.stderr.on('data', (data) => errorString += data.toString());
 
-    await new Promise((resolve, reject) => {
+    const processPromise = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pythonProcess.kill();
+        reject(new Error('Process timeout after 30s'));
+      }, 30000);
+
       pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`Python process exited with code ${code}\nError: ${errorString}`));
-        } else {
-          resolve();
-        }
+        clearTimeout(timeout);
+        if (code !== 0) reject(new Error(`Process exited ${code}: ${errorString}`));
+        else resolve();
       });
 
       pythonProcess.on('error', (error) => {
-        reject(new Error(`Failed to start Python process: ${error.message}`));
+        clearTimeout(timeout);
+        reject(new Error(`Failed to start: ${error.message}`));
       });
     });
 
-    try {
-      const result = JSON.parse(dataString);
-      res.json(result);
-    } catch (e) {
-      res.status(500).json({
-        error: 'Invalid Python output',
-        message: e.toString(),
-        output: dataString
-      });
-    }
+    await processPromise;
+    res.json(JSON.parse(dataString));
+
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({
-      error: 'Calculation error',
-      message: error.toString()
+      status: 'error',
+      error: error.toString()
     });
   }
 };

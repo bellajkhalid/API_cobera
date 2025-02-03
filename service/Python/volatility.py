@@ -1,6 +1,6 @@
 import json
 import sys
-from volatilityDensityModel import calculate_vols_and_density
+from common.volatilityDensityModel import calculate_vols_and_density
 
 def volatility_smile_and_density(initial_values, current_params, model_type="asv", legacy_parametrisation=False):
     # Calculate for initial values

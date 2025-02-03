@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ZABR Model Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.1/plotly.min.js"></script>
+    <style>
+        .container {
+            width: 90%;
+            max-width: 1400px;
+            margin: 20px auto;
+            font-family: Arial, sans-serif;
+        }
+
+        .model-selector {
+            margin: 20px 0;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-group {
+            margin: 10px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .slider-container {
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #eee;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .slider-container:hover {
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        label {
+            display: inline-block;
+            width: 80px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        select {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            margin-left: 10px;
+            background: white;
+        }
+
+        input[type="range"] {
+            width: 150px;
+            vertical-align: middle;
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]:hover {
+            opacity: 0.8;
+        }
+
+        .value-display {
+            display: inline-block;
+            width: 60px;
+            text-align: right;
+            margin-left: 10px;
+            font-family: monospace;
+            color: #666;
+            transition: color 0.3s ease;
+        }
+
+        .value-display.changed {
+            color: #2980b9;
+            font-weight: bold;
+        }
+
+        .graphs {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .graph {
+            flex: 1;
+            min-width: 600px;
+            height: 450px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .button-container {
+            margin: 15px 0;
+            text-align: right;
+            padding: 0 20px;
+        }
+
+        .reset-button {
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .reset-button:hover {
+            background-color: #34495e;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .reset-button:active {
+            transform: translateY(1px);
+        }
+
+        .reset-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: #2c3e50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+        }
+
+        .slider-container:hover .tooltip {
+            opacity: 1;
+        }
+
+        .graphs.loading {
+            position: relative;
+        }
+
+        .graphs.loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>ZABR Model Visualization</h1>
+
+        <div class="model-selector">
+            <label for="modelType">Model Type:</label>
+            <select id="modelType" onchange="updateModelParams()">
+                <option value="classical">Classical ZABR</option>
+                <option value="mixture">Mixture ZABR</option>
+                <option value="pde">PDE SABR</option>
+            </select>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="slider-container">
+                    <span class="tooltip">Forward price</span>
+                    <label>Forward:</label>
+                    <input type="range" id="forward" min="0.001" max="0.1" step="0.001" value="0.0325">
+                    <span id="forwardValue" class="value-display">0.0325</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Time to expiry</span>
+                    <label>Expiry:</label>
+                    <input type="range" id="expiry" min="1" max="50" step="1" value="10">
+                    <span id="expiryValue" class="value-display">10.0</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Alpha parameter</span>
+                    <label>Alpha:</label>
+                    <input type="range" id="alpha" min="0.001" max="0.2" step="0.001" value="0.0873">
+                    <span id="alphaValue" class="value-display">0.0873</span>
+                </div>
+            </div>
+
+            <div class="control-group common-controls">
+                <div class="slider-container">
+                    <span class="tooltip">Beta parameter</span>
+                    <label>Beta:</label>
+                    <input type="range" id="beta" min="0" max="1" step="0.01" value="0.7">
+                    <span id="betaValue" class="value-display">0.70</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Nu parameter</span>
+                    <label>Nu:</label>
+                    <input type="range" id="nu" min="0" max="2" step="0.01" value="0.47">
+                    <span id="nuValue" class="value-display">0.47</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Rho parameter</span>
+                    <label>Rho:</label>
+                    <input type="range" id="rho" min="-1" max="1" step="0.01" value="-0.48">
+                    <span id="rhoValue" class="value-display">-0.48</span>
+                </div>
+            </div>
+
+            <div class="control-group common-controls">
+                <div class="slider-container">
+                    <span class="tooltip">Shift parameter</span>
+                    <label>Shift:</label>
+                    <input type="range" id="shift" min="0" max="1" step="0.01" value="0.0">
+                    <span id="shiftValue" class="value-display">0.00</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Gamma parameter</span>
+                    <label>Gamma:</label>
+                    <input type="range" id="gamma" min="0" max="2" step="0.01" value="1.0">
+                    <span id="gammaValue" class="value-display">1.00</span>
+                </div>
+            </div>
+
+            <!-- Mixture-specific parameters -->
+            <!-- Mixture ZABR Controls -->
+            <div id="mixtureControls" class="control-group" style="display: none;">
+                <!-- Forward -->
+                <div class="slider-container">
+                    <span class="tooltip">Forward price (default: -0.0007)</span>
+                    <label>Forward:</label>
+                    <input type="range" id="forward" min="-0.01" max="0.01" step="0.0001" value="-0.0007">
+                    <span id="forwardValue" class="value-display">-0.0007</span>
+                </div>
+                <!-- Expiry -->
+                <div class="slider-container">
+                    <span class="tooltip">Time to expiry (default: 30.0)</span>
+                    <label>Expiry:</label>
+                    <input type="range" id="expiry" min="1" max="50" step="0.1" value="30.0">
+                    <span id="expiryValue" class="value-display">30.0</span>
+                </div>
+                <!-- Alpha -->
+                <div class="slider-container">
+                    <span class="tooltip">Alpha parameter (default: 0.0132)</span>
+                    <label>Alpha:</label>
+                    <input type="range" id="alpha" min="0.001" max="0.1" step="0.0001" value="0.0132">
+                    <span id="alphaValue" class="value-display">0.0132</span>
+                </div>
+                <!-- Beta1 -->
+                <div class="slider-container">
+                    <span class="tooltip">Beta1 parameter (default: 0.2)</span>
+                    <label>Beta1:</label>
+                    <input type="range" id="beta1" min="0" max="1" step="0.01" value="0.2">
+                    <span id="beta1Value" class="value-display">0.20</span>
+                </div>
+                <!-- Beta2 -->
+                <div class="slider-container">
+                    <span class="tooltip">Beta2 parameter (default: 1.25)</span>
+                    <label>Beta2:</label>
+                    <input type="range" id="beta2" min="0.5" max="2" step="0.01" value="1.25">
+                    <span id="beta2Value" class="value-display">1.25</span>
+                </div>
+                <!-- D parameter -->
+                <div class="slider-container">
+                    <span class="tooltip">D parameter (default: 0.2)</span>
+                    <label>D:</label>
+                    <input type="range" id="d" min="0" max="1" step="0.01" value="0.2">
+                    <span id="dValue" class="value-display">0.20</span>
+                </div>
+                <!-- Nu -->
+                <div class="slider-container">
+                    <span class="tooltip">Nu parameter (default: 0.1978)</span>
+                    <label>Nu:</label>
+                    <input type="range" id="nu" min="0" max="1" step="0.0001" value="0.1978">
+                    <span id="nuValue" class="value-display">0.1978</span>
+                </div>
+                <!-- Rho -->
+                <div class="slider-container">
+                    <span class="tooltip">Rho parameter (default: -0.444)</span>
+                    <label>Rho:</label>
+                    <input type="range" id="rho" min="-1" max="1" step="0.001" value="-0.444">
+                    <span id="rhoValue" class="value-display">-0.444</span>
+                </div>
+                <!-- High Strike -->
+                <div class="slider-container">
+                    <span class="tooltip">High strike (default: 0.1)</span>
+                    <label>High Strike:</label>
+                    <input type="range" id="highStrike" min="0.05" max="0.5" step="0.01" value="0.1">
+                    <span id="highStrikeValue" class="value-display">0.10</span>
+                </div>
+                <!-- Vol Low -->
+                <div class="slider-container">
+                    <span class="tooltip">Low volatility (default: 0.0001)</span>
+                    <label>Vol Low:</label>
+                    <input type="range" id="volLow" min="0.0001" max="0.001" step="0.0001" value="0.0001">
+                    <span id="volLowValue" class="value-display">0.0001</span>
+                </div>
+                <!-- Low Strike -->
+                <div class="slider-container">
+                    <span class="tooltip">Low strike (default: 0.02)</span>
+                    <label>Low Strike:</label>
+                    <input type="range" id="lowStrike" min="0.01" max="0.1" step="0.01" value="0.02">
+                    <span id="lowStrikeValue" class="value-display">0.02</span>
+                </div>
+                <!-- Forward Cut Off -->
+                <div class="slider-container">
+                    <span class="tooltip">Forward cut off (default: 0.02)</span>
+                    <label>Cut Off:</label>
+                    <input type="range" id="forwardCutOff" min="0.01" max="0.1" step="0.01" value="0.02">
+                    <span id="forwardCutOffValue" class="value-display">0.02</span>
+                </div>
+                <!-- Smoothing Factor -->
+                <div class="slider-container">
+                    <span class="tooltip">Smoothing factor (default: 0.001)</span>
+                    <label>Smoothing:</label>
+                    <input type="range" id="smoothingFactor" min="0.0001" max="0.01" step="0.0001" value="0.001">
+                    <span id="smoothingFactorValue" class="value-display">0.001</span>
+                </div>
+            </div>
+
+            <!-- PDE-specific parameters -->
+            <div id="pdeControls" class="control-group" style="display: none;">
+                <div class="slider-container">
+                    <span class="tooltip">Grid points</span>
+                    <label>N:</label>
+                    <input type="range" id="N" min="50" max="200" step="10" value="100">
+                    <span id="NValue" class="value-display">100</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">Time steps</span>
+                    <label>Steps:</label>
+                    <input type="range" id="timesteps" min="1" max="10" step="1" value="5">
+                    <span id="timestepsValue" class="value-display">5</span>
+                </div>
+                <div class="slider-container">
+                    <span class="tooltip">ND parameter</span>
+                    <label>ND:</label>
+                    <input type="range" id="nd" min="1" max="10" step="1" value="5">
+                    <span id="ndValue" class="value-display">5</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-container">
+            <button onclick="resetToDefault()" class="reset-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                </svg>
+                Reset to Default Values
+            </button>
+        </div>
+
+        <div class="graphs">
+            <div id="volatilityGraph" class="graph"></div>
+            <div id="strikeGraph" class="graph"></div>
+        </div>
+    </div>
+
+    <script>
+        // Model default parameters
+        const modelDefaults = {
+            classical: {
+                expiry: 10.0,
+                forward: 0.0325,
+                alpha: 0.0873,
+                beta: 0.7,
+                nu: 0.47,
+                rho: -0.48,
+                shift: 0.0,
+                gamma: 1.0,
+                use_vol_adjustement: true
+            },
+            mixture: {
+                expiry: 30.0,
+                forward: -0.0007,
+                alpha: 0.0132,
+                beta1: 0.2,
+                beta2: 1.25,
+                d: 0.2,
+                nu: 0.1978,
+                rho: -0.444,
+                gamma: 1.0,
+                use_vol_adjustement: true,
+                high_strike: 0.1,
+                vol_low: 0.0001,
+                low_strike: 0.02,
+                forward_cut_off: 0.02,
+                smothing_factor: 0.001
+            },
+            pde: {
+                expiry: 30.0,
+                forward: 0.02,
+                alpha: 0.035,
+                beta: 0.25,
+                nu: 1.0,
+                rho: -0.1,
+                shift: 0.0,
+                N: 100,
+                timesteps: 5,
+                nd: 5
+            }
+        };
+        let plotsInitialized = false;
+        let currentData = null;
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        function initializePlots() {
+            if (plotsInitialized) return;
+
+            const emptyData = [{
+                x: [],
+                y: [],
+                mode: 'lines',
+                name: 'Initial'
+            }];
+
+            const layout = {
+                title: {
+                    text: 'Loading...',
+                    font: {
+                        family: 'Arial, sans-serif',
+                        size: 24,
+                        color: '#2c3e50'
+                    }
+                },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                autosize: true
+            };
+
+            Plotly.newPlot('volatilityGraph', emptyData, layout);
+            Plotly.newPlot('strikeGraph', emptyData, layout);
+            plotsInitialized = true;
+        }
+
+        function updateModelParams() {
+            const modelType = document.getElementById('modelType').value;
+            const params = modelDefaults[modelType];
+
+            // Update common controls visibility
+            const commonControls = document.getElementsByClassName('common-controls');
+            for (let controls of commonControls) {
+                controls.style.display = modelType === 'mixture' ? 'none' : 'grid';
+            }
+
+            // Update specific controls visibility
+            document.getElementById('mixtureControls').style.display =
+                modelType === 'mixture' ? 'grid' : 'none';
+            document.getElementById('pdeControls').style.display =
+                modelType === 'pde' ? 'grid' : 'none';
+
+            // Update all inputs with default values
+            Object.entries(params).forEach(([key, value]) => {
+                const input = document.getElementById(key);
+                const display = document.getElementById(`${key}Value`);
+                if (input && display) {
+                    input.value = value;
+                    display.textContent = typeof value === 'number'
+                        ? value.toFixed(Number.isInteger(value) ? 0 : 4)
+                        : value;
+                    display.classList.remove('changed');
+                }
+            });
+
+            // Update graphs with new parameters
+            updateGraphs();
+        }
+
+        async function updateGraphs() {
+            if (!plotsInitialized) initializePlots();
+
+            try {
+                document.querySelector('.graphs').classList.add('loading');
+                const modelType = document.getElementById('modelType').value;
+                const params = collectParameters(modelType);
+
+                // Build query string
+                const queryString = Object.entries(params)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join('&');
+
+                // Call appropriate API endpoint
+                const response = await fetch(`/api/zabr/${modelType}?${queryString}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (result.status === 'error') {
+                    throw new Error(result.error || 'Calculation error');
+                }
+
+                currentData = result.data;
+
+                // Update both graphs
+                await Promise.all([
+                    updateVolatilityGraph(currentData),
+                    updateStrikeGraph(currentData)
+                ]);
+
+            } catch (error) {
+                console.error('Error updating graphs:', error);
+                showError(error.message);
+            } finally {
+                document.querySelector('.graphs').classList.remove('loading');
+            }
+        }
+
+        function collectParameters(modelType) {
+            switch (modelType) {
+                case 'classical':
+                    return {
+                        expiry: getValue('expiry'),
+                        forward: getValue('forward'),
+                        alpha: getValue('alpha'),
+                        beta: getValue('beta'),
+                        nu: getValue('nu'),
+                        rho: getValue('rho'),
+                        shift: getValue('shift'),
+                        gamma: getValue('gamma'),
+                        use_vol_adjustement: true
+                    };
+
+                case 'mixture':
+                    return {
+                        expiry: getValue('expiry'),
+                        forward: getValue('forward'),
+                        alpha: getValue('alpha'),
+                        beta1: getValue('beta1'),
+                        beta2: getValue('beta2'),
+                        d: getValue('d'),
+                        nu: getValue('nu'),
+                        rho: getValue('rho'),
+                        gamma: 1.0,  // Fixed value
+                        use_vol_adjustement: true,
+                        high_strike: 0.1,  // Default values
+                        vol_low: 0.0001,
+                        low_strike: 0.02,
+                        forward_cut_off: 0.02,
+                        smothing_factor: 0.001
+                    };
+
+                case 'pde':
+                    return {
+                        expiry: getValue('expiry'),
+                        forward: getValue('forward'),
+                        alpha: getValue('alpha'),
+                        beta: getValue('beta'),
+                        nu: getValue('nu'),
+                        rho: getValue('rho'),
+                        shift: getValue('shift'),
+                        N: getValue('N'),
+                        timesteps: getValue('timesteps'),
+                        nd: getValue('nd')
+                    };
+
+                default:
+                    throw new Error(`Unknown model type: ${modelType}`);
+            }
+        }
+
+        function getValue(id) {
+            const el = document.getElementById(id);
+            if (!el) {
+                console.warn(`Control not found for: ${id}, using default value`);
+                return null;
+            }
+            const val = parseFloat(el.value);
+            if (isNaN(val)) {
+                console.warn(`Invalid value for ${id}: ${el.value}`);
+                return null;
+            }
+            return val;
+        }
+
+        // Use the parameters in the update function
+        async function updateGraphs() {
+            if (!plotsInitialized) initializePlots();
+
+            try {
+                document.querySelector('.graphs').classList.add('loading');
+                const modelType = document.getElementById('modelType').value;
+                const params = collectParameters(modelType);
+
+                // Filter out null values and build query string
+                const queryString = Object.entries(params)
+                    .filter(([_, value]) => value !== null)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join('&');
+
+                console.log('Sending request with params:', params);
+
+                const response = await fetch(`/api/zabr/${modelType}?${queryString}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (result.status === 'error') {
+                    throw new Error(result.error || 'Calculation error');
+                }
+
+                currentData = result.data;
+                await Promise.all([
+                    updateVolatilityGraph(currentData),
+                    updateStrikeGraph(currentData)
+                ]);
+
+            } catch (error) {
+                console.error('Error updating graphs:', error);
+                showError(error.message);
+            } finally {
+                document.querySelector('.graphs').classList.remove('loading');
+            }
+        }
+        function getValue(id) {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            const val = parseFloat(el.value);
+            return isNaN(val) ? null : val;
+        }
+
+        async function updateVolatilityGraph(data) {
+            const traces = [
+                {
+                    x: data.initial.strikes,
+                    y: data.initial.vols,
+                    name: 'Initial Volatility',
+                    mode: 'lines',
+                    line: { color: '#2ecc71', width: 2, dash: 'dash' }
+                },
+                {
+                    x: data.current.strikes,
+                    y: data.current.vols,
+                    name: 'Current Volatility',
+                    mode: 'lines',
+                    line: { color: '#3498db', width: 2 }
+                }
+            ];
+
+            if (data.current.market_vols) {
+                traces.push({
+                    x: data.current.market_strikes,
+                    y: data.current.market_vols,
+                    name: 'Market Data',
+                    mode: 'markers',
+                    marker: { color: '#e74c3c', size: 8 }
+                });
+            }
+
+            const layout = {
+                title: {
+                    text: 'ZABR Volatility Surface',
+                    font: { family: 'Arial, sans-serif', size: 24, color: '#2c3e50' }
+                },
+                showlegend: true,
+                legend: getDefaultLegendConfig(),
+                xaxis: getAxisConfig('Strike'),
+                yaxis: getAxisConfig('Implied Volatility'),
+                ...getDefaultLayoutConfig()
+            };
+
+            await Plotly.react('volatilityGraph', traces, layout, getDefaultPlotConfig());
+        }
+
+        async function updateStrikeGraph(data) {
+            const traces = [
+                {
+                    x: data.initial.strikes,
+                    y: data.initial.strikes,
+                    name: 'Initial Strike',
+                    mode: 'lines',
+                    line: { color: '#e74c3c', width: 2, dash: 'dash' }
+                },
+                {
+                    x: data.current.strikes,
+                    y: data.current.strikes,
+                    name: 'Current Strike',
+                    mode: 'lines',
+                    line: { color: '#9b59b6', width: 2 }
+                }
+            ];
+
+            const layout = {
+                title: {
+                    text: 'Strike Surface',
+                    font: { family: 'Arial, sans-serif', size: 24, color: '#2c3e50' }
+                },
+                showlegend: true,
+                legend: getDefaultLegendConfig(),
+                xaxis: getAxisConfig('Strike'),
+                yaxis: getAxisConfig('Strike'),
+                ...getDefaultLayoutConfig()
+            };
+
+            await Plotly.react('strikeGraph', traces, layout, getDefaultPlotConfig());
+        }
+
+        // Helper functions for plot configuration
+        function getDefaultLegendConfig() {
+            return {
+                x: 0.05,
+                y: 0.95,
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                bordercolor: '#ddd',
+                borderwidth: 1
+            };
+        }
+
+        function getAxisConfig(title) {
+            return {
+                title: {
+                    text: title,
+                    font: { family: 'Arial, sans-serif', size: 14, color: '#666' }
+                },
+                gridcolor: '#eee',
+                zerolinecolor: '#666',
+                zerolinewidth: 1
+            };
+        }
+
+        function getDefaultLayoutConfig() {
+            return {
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                margin: { t: 60, r: 30, b: 60, l: 60 },
+                hovermode: 'closest'
+            };
+        }
+
+        function getDefaultPlotConfig() {
+            return {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToAdd: [
+                    'drawline', 'drawopenpath', 'drawclosedpath',
+                    'drawcircle', 'drawrect', 'eraseshape'
+                ],
+                modeBarButtonsToRemove: ['lasso2d']
+            };
+        }
+
+        function showError(message) {
+            const errorLayout = {
+                annotations: [{
+                    text: 'Error: ' + message,
+                    xref: 'paper',
+                    yref: 'paper',
+                    showarrow: false,
+                    font: { size: 16, color: 'red' }
+                }]
+            };
+            Plotly.relayout('volatilityGraph', errorLayout);
+            Plotly.relayout('strikeGraph', errorLayout);
+        }
+
+        // Initialize event listeners
+        const debouncedUpdate = debounce(updateGraphs, 250);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add listeners to all inputs
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    // Update value display
+                    const display = document.getElementById(`${e.target.id}Value`);
+                    if (display) {
+                        const val = parseFloat(e.target.value);
+                        display.textContent = val.toFixed(
+                            Number.isInteger(val) ? 0 : 4
+                        );
+                        // Highlight changed values
+                        const defaultVal = modelDefaults[document.getElementById('modelType').value][e.target.id];
+                        display.classList.toggle('changed', Math.abs(val - defaultVal) > 1e-10);
+                    }
+                    debouncedUpdate();
+                });
+            });
+
+            // Initialize plots and update with default values
+            initializePlots();
+            updateModelParams();
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', debounce(() => {
+            if (plotsInitialized) {
+                Plotly.Plots.resize('volatilityGraph');
+                Plotly.Plots.resize('strikeGraph');
+            }
+        }, 250));
+    </script>
+</body>
+
+</html>

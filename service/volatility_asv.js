@@ -1,4 +1,3 @@
-// hjm.js
 'use strict';
 
 const path = require('path');
@@ -8,21 +7,37 @@ const { spawn } = require('child_process');
 const XSIGMA_PYTHON = 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe';
 const XSIGMA_SITE_PACKAGES = 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages';
 
-exports.getHjmCalibration = async function(req, res) {
+exports.getVolatilityData_asv = async function(req, res) {
   try {
     // Extract parameters from request
-    const test = parseInt(req.query.test || '1');
+    const {
+      fwd = 1.0,
+      time = 0.333,
+      ctrl_p = 0.2,
+      ctrl_c = 0.2,
+      atm = 0.1929,
+      skew = 0.02268,
+      smile = 0.003,
+      put = 0.0384,
+      call = 0.0001
+    } = req.query;
 
-    // Validate parameter
-    if (![1, 2, 3].includes(test)) {
-      const error = new Error('test parameter must be 1, 2, or 3');
-      error.status = 400;
-      throw error;
-    }
+    // Validate parameters
+    const params = {
+      fwd: parseFloat(fwd),
+      time: parseFloat(time),
+      ctrl_p: parseFloat(ctrl_p),
+      ctrl_c: parseFloat(ctrl_c),
+      atm: parseFloat(atm),
+      skew: parseFloat(skew),
+      smile: parseFloat(smile),
+      put: parseFloat(put),
+      call: parseFloat(call)
+    };
 
     // Get absolute paths
     const projectRoot = path.resolve(__dirname, '..');
-    const pythonScriptPath = path.join(projectRoot, 'service', 'Python', 'HJM.py');
+    const pythonScriptPath = path.join(projectRoot, 'service', 'Python', 'volatility.py');
     
     // Verify Python script exists
     if (!fs.existsSync(pythonScriptPath)) {
@@ -49,15 +64,18 @@ exports.getHjmCalibration = async function(req, res) {
     console.log('Script Path:', pythonScriptPath);
     console.log('PYTHONPATH:', env.PYTHONPATH);
     console.log('Working Directory:', path.dirname(pythonScriptPath));
-    console.log('Test Parameter:', test);
-    // Increase timeout for test 2
-    const timeout = req.query.test === '2' ? 120000 : 30000;
+    console.log('Parameters:', params);
+
     // Create Python process
-    const pythonProcess = spawn(XSIGMA_PYTHON, [pythonScriptPath, test.toString()], {
-      env,
-      cwd: path.dirname(pythonScriptPath),
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const pythonProcess = spawn(
+      XSIGMA_PYTHON, 
+      [pythonScriptPath, JSON.stringify(params)], 
+      {
+        env,
+        cwd: path.dirname(pythonScriptPath),
+        stdio: ['pipe', 'pipe', 'pipe']
+      }
+    );
 
     let dataString = '';
     let errorString = '';
@@ -95,10 +113,11 @@ exports.getHjmCalibration = async function(req, res) {
         reject(new Error(`Failed to start XSigma Python process: ${error.message}`));
       });
 
+      // Add timeout
       setTimeout(() => {
         pythonProcess.kill();
-        reject(new Error(`Python process timed out after ${timeout/1000} seconds`));
-      }, timeout);
+        reject(new Error('Python process timed out after 30 seconds'));
+      }, 30000);
     });
 
     try {
@@ -109,7 +128,10 @@ exports.getHjmCalibration = async function(req, res) {
       }
       const lastJson = jsonMatch[jsonMatch.length - 1];
       const result = JSON.parse(lastJson);
-      return res.json(result);
+      return res.json({
+        status: 'success',
+        data: result
+      });
     } catch (e) {
       console.error('Failed to parse Python output:', e);
       console.error('Raw output:', dataString);

@@ -3,7 +3,7 @@
 const path = require('path');
 const { spawn } = require('child_process');
 
-// Configuration for Python environment
+// Configuration constants
 const PYTHON_CONFIG = {
   EXECUTABLE: process.platform === 'win32' 
     ? 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe'
@@ -17,73 +17,35 @@ const PYTHON_CONFIG = {
   TIMEOUT_MS: 30000
 };
 
-exports.getHartmanWatsonDistribution = async function(req, res) {
+exports.getVolatilityDataSvi = async function(req, res) {
   try {
     // Extract parameters from request with defaults
     const params = {
-      n: parseInt(req.query.n || '64'),
-      t: parseFloat(req.query.t || '0.5'),
-      size_roots: parseInt(req.query.size_roots || '32'),
-      x_0: parseFloat(req.query.x_0 || '-5'),
-      x_n: parseFloat(req.query.x_n || '3.1')
+      fwd: parseFloat(req.query.fwd || '1.0'),
+      time: parseFloat(req.query.time || '0.333'),
+      b: parseFloat(req.query.b || '0.1'),
+      m: parseFloat(req.query.m || '0.01'),
+      sigma: parseFloat(req.query.sigma || '0.4')
     };
 
-    console.log('Computing Hartman-Watson distribution with params:', params);
-
-    // Validate all parameters are numbers
+    // Validate numeric parameters
     for (const [key, value] of Object.entries(params)) {
       if (isNaN(value)) {
-        const error = new Error(`Invalid numeric value for parameter: ${key}`);
-        error.status = 400;
-        throw error;
+        return res.status(400).json({
+          status: 'error',
+          error: `Invalid numeric value for parameter: ${key}`
+        });
       }
     }
 
-    // Additional validation
-    if (params.n <= 0) {
-      const error = new Error('n must be positive');
-      error.status = 400;
-      throw error;
-    }
-    if (params.t <= 0) {
-      const error = new Error('t must be positive');
-      error.status = 400;
-      throw error;
-    }
-    if (params.size_roots <= 0) {
-      const error = new Error('size_roots must be positive');
-      error.status = 400;
-      throw error;
-    }
-    if (params.x_0 >= params.x_n) {
-      const error = new Error('x_0 must be less than x_n');
-      error.status = 400;
-      throw error;
-    }
-
     // Set up paths
-    const pythonScriptPath = path.join(__dirname, './Python/HW_distribution.py');
-    
-    // Prepare the arguments array
-    const args = [
+    const pythonScriptPath = path.join(__dirname, 'Python', 'volatility_svi.py');
+
+    // Prepare process
+    const pythonProcess = spawn(PYTHON_CONFIG.EXECUTABLE, [
       pythonScriptPath,
-      params.n.toString(),
-      params.t.toString(),
-      params.size_roots.toString(),
-      params.x_0.toString(),
-      params.x_n.toString()
-    ];
-
-    // Log execution details
-    console.log('[Configuration]', {
-      pythonExecutable: PYTHON_CONFIG.EXECUTABLE,
-      scriptPath: pythonScriptPath,
-      arguments: args,
-      workingDirectory: path.dirname(pythonScriptPath)
-    });
-
-    // Create Python process
-    const pythonProcess = spawn(PYTHON_CONFIG.EXECUTABLE, args, {
+      JSON.stringify(params)
+    ], {
       env: {
         ...process.env,
         PYTHONPATH: PYTHON_CONFIG.SITE_PACKAGES,
@@ -107,6 +69,7 @@ exports.getHartmanWatsonDistribution = async function(req, res) {
       errorString += str;
     });
 
+    // Wait for process completion
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pythonProcess.kill();
@@ -132,26 +95,21 @@ exports.getHartmanWatsonDistribution = async function(req, res) {
     });
 
     try {
-      const result = JSON.parse(dataString);
-      if (result.status === 'error') {
-        const error = new Error(result.error);
-        error.status = 500;
-        throw error;
+      // Find and parse JSON output
+      const jsonMatch = dataString.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in Python output');
       }
+
+      const result = JSON.parse(jsonMatch[0]);
       return res.json(result);
     } catch (e) {
-      const error = new Error('Invalid Python output: ' + e.toString());
-      error.status = 500;
-      throw error;
+      throw new Error('Failed to parse Python output: ' + e.toString());
     }
   } catch (error) {
-    if (!error.status) {
-      error.status = 500;
-    }
     console.error('[Error]', error);
-    res.status(error.status).json({
+    res.status(500).json({
       status: 'error',
-      data: null,
       error: error.message
     });
   }

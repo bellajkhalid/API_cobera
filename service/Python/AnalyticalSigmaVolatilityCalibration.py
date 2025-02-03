@@ -1,11 +1,29 @@
-# AnalyticalSigmaVolatilityCalibration.py
+#!/usr/bin/env python3
+
+import sys
 import json
 import numpy as np
-import sys
-from xsigmamodules.Util import analyticalSigmaVolatility, blackScholes, sigmaVolatilityInspired
+from xsigmamodules.Util import (
+    blackScholes,
+    sigmaVolatilityInspired,
+    volatility_type
+)
 from xsigmamodules.util.numpy_support import xsigmaToNumpy, numpyToXsigma
-from volatilityDensityModel import calculate_vols_and_density, generate_sample_data
-def density(obj, strikes, spot, expiry):
+from xsigmamodules.Market import volatilityModelExtendedSvi
+from xsigmamodules.Math import (
+    solverOptionsCeres,
+    solverOptionsLm,
+    solverOptionsNlopt,
+    nlopt_algo_name
+)
+from common.volatilityDensityModel import (
+    create_interactive_model,
+    plot_density,
+    generate_sample_data,
+    plot_volatility_smile
+)
+
+def density_new(obj, strikes, spot, expiry):
     n = len(strikes)
     arrays = {
         "vols": np.zeros(n),
@@ -20,9 +38,11 @@ def density(obj, strikes, spot, expiry):
         "ref2_sensitivity": np.zeros(n),
         "strike2_sensitivity": np.zeros(n),
     }
-    obj.asv_with_sensitivities(
-        numpyToXsigma(strikes), *[numpyToXsigma(arr) for arr in arrays.values()], False
+
+    obj.sensitivities(
+        expiry, numpyToXsigma(strikes), *[numpyToXsigma(arr) for arr in arrays.values()]
     )
+
     density = [
         blackScholes.density(spot, strike, expiry, vol, strike_sens, strike2_sens)
         for strike, vol, strike_sens, strike2_sens in zip(
@@ -32,102 +52,136 @@ def density(obj, strikes, spot, expiry):
             arrays["strike2_sensitivity"],
         )
     ]
-    density_data = {
-        "strikes": strikes.tolist(),
-        "density": density
-    }
-    return density_data
 
+    return density
+
+
+def calculate_vols_and_density(params, computation_type):
+    try:
+        calibration_strikes, bid_values, ask_values, mid_values = generate_sample_data()
+        
+        initial_guess_obj = volatilityModelExtendedSvi(
+            params['spot'], 0.2, params['volvol'], params['beta'], 
+            params['rho'], params['r'], params['q'], 0.00006
+        )
+
+        # Calibrate with different solvers
+        options_ceres = solverOptionsCeres(500, 1e-14, 1e-14, 1e-14)
+        calibrated_obj_ceres = volatilityModelExtendedSvi.calibrate(
+            numpyToXsigma(calibration_strikes),
+            numpyToXsigma(mid_values),
+            params['spot'],
+            params['expiry'],
+            options_ceres,
+            1,
+            1,
+            initial_guess_obj
+        )
+
+        strikes = np.linspace(1800, 2700, params['n'])
+
+        if computation_type == "volatility_asv":
+            vols = np.zeros(params['n'])
+            calibrated_obj_ceres.implied_volatility(
+                numpyToXsigma(vols),
+                numpyToXsigma(strikes),
+                1.0,
+                params['expiry'],
+                volatility_type.LOG_NORMAL
+            )
+            
+            return {
+                "status": "success",
+                "computationType": "volatility_asv",
+                "data": {
+                    "calibration_strikes": calibration_strikes.tolist(),
+                    "bid_values": bid_values.tolist(),
+                    "ask_values": ask_values.tolist(),
+                    "mid_values": mid_values.tolist(),
+                    "strikes": strikes.tolist(),
+                    "vols": vols.tolist()
+                }
+            }
+
+        elif computation_type == "density":
+            density=density_new(calibrated_obj_ceres, strikes, params['spot'], params['expiry'])
+            return {
+                "status": "success",
+                "computationType": "density",
+                "data": {
+                    "strikes": strikes.tolist(),
+                    "density": density
+                }
+            }
+
+        elif computation_type == "volatility_svi":
+            initial_values = {
+                "fwd": 1.0,
+                "time": 0.333,
+                "b": 0.1,
+                "m": 0.01,
+                "sigma": 0.4
+            }
+            
+            obj_svi = sigmaVolatilityInspired(
+                params['spot'],
+                initial_values["b"],
+                initial_values["m"],
+                initial_values["sigma"]
+            )
+            obj_svi.calibrate(
+                numpyToXsigma(mid_values),
+                numpyToXsigma(calibration_strikes)
+            )
+            
+            vols = np.zeros(params['n'])
+            obj_svi.svi(numpyToXsigma(vols), numpyToXsigma(strikes))
+            
+            return {
+                "status": "success",
+                "computationType": "volatility_svi",
+                "data": {
+                    "calibration_strikes": calibration_strikes.tolist(),
+                    "bid_values": bid_values.tolist(),
+                    "ask_values": ask_values.tolist(),
+                    "mid_values": mid_values.tolist(),
+                    "strikes": strikes.tolist(),
+                    "vols": vols.tolist()
+                }
+            }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 def main():
     try:
-        # Parse command line arguments directly
         if len(sys.argv) < 10:
-            raise ValueError("Insufficient arguments provided")
+            raise ValueError("Insufficient arguments")
 
-        num_points = int(sys.argv[1])
-        spot = float(sys.argv[2])
-        expiry = float(sys.argv[3])
-        risk_free_rate = float(sys.argv[4])
-        dividend_yield = float(sys.argv[5])
-        beta = float(sys.argv[6])
-        rho = float(sys.argv[7])
-        volvol = float(sys.argv[8])
-        computationType = sys.argv[9]
-
-        # Generate sample data
-        calibration_strikes, bid_values, ask_values, mid_values = generate_sample_data()
-
-        # Create and calibrate the analyticalSigmaVolatility object
-        obj = analyticalSigmaVolatility(
-            expiry, spot, spot, 0.2, volvol, beta, rho, 
-            risk_free_rate, dividend_yield, 0.00006
-        )
-        obj.calibrate(numpyToXsigma(mid_values), numpyToXsigma(calibration_strikes))
-
-        # Calculate volatilities
-        vols = np.zeros(num_points)
-        strikes = np.linspace(1800, 2700, num_points)
-        obj.asv(numpyToXsigma(vols), numpyToXsigma(strikes))
-
-        volatility_asv = {
-            "calibration_strikes": calibration_strikes.tolist(),
-            "bid_values": bid_values.tolist(),
-            "ask_values": ask_values.tolist(),
-            "mid_values": mid_values.tolist(),
-            "strikes": strikes.tolist(),
-            "vols": vols.tolist()
+        params = {
+            'n': int(sys.argv[1]),
+            'spot': float(sys.argv[2]),
+            'expiry': float(sys.argv[3]),
+            'r': float(sys.argv[4]),
+            'q': float(sys.argv[5]),
+            'beta': float(sys.argv[6]),
+            'rho': float(sys.argv[7]),
+            'volvol': float(sys.argv[8])
         }
-        #********************************************************************************
-        initial_values = {
-            "fwd": 1,  # Midpoint of strike range
-            "time": 0.333,
-            "b": 0.1,
-            "m": 0.01,
-            "sigma": 0.4,
-        }
-        obj_svi = sigmaVolatilityInspired(spot, initial_values["b"], initial_values["m"], initial_values["sigma"])
-        obj_svi.calibrate(numpyToXsigma(mid_values), numpyToXsigma(calibration_strikes))
-        obj_svi.svi(numpyToXsigma(vols), numpyToXsigma(strikes))
+        computation_type = sys.argv[9]
 
-        
-        volatility_svi = {
-            "calibration_strikes": calibration_strikes.tolist(),
-            "bid_values": bid_values.tolist(),
-            "ask_values": ask_values.tolist(),
-            "mid_values": mid_values.tolist(),
-            "strikes": strikes.tolist(),
-            "vols": vols.tolist()
-        }
-       #********************************************************************************
-        response = {
-            "status": "success",
-            "data": None,
-            "error": None,
-            "computationType": computationType
-        }
-
-        if computationType == "volatility_asv":
-            response["data"] = volatility_asv
-        elif computationType == "density":
-            density_data = density(obj, strikes, spot, expiry)
-            response["data"] = density_data
-        elif computationType == "volatility_svi":
-            response["data"] = volatility_svi
-        else:
-            response["status"] = "error"
-            response["error"] = f"Invalid computation type: {computationType}"
-
-        print(json.dumps(response))
+        result = calculate_vols_and_density(params, computation_type)
+        print(json.dumps(result))
 
     except Exception as e:
-        error_response = {
+        print(json.dumps({
             "status": "error",
-            "data": None,
-            "error": str(e),
-            "computationType": computationType if 'computationType' in locals() else None
-        }
-        print(json.dumps(error_response))
+            "error": str(e)
+        }))
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

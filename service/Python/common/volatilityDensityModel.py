@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from xsigmamodules.Util import (
-    analyticalSigmaVolatility,
     blackScholes,
     sigmaVolatilityInspired,
+    volatility_type,
 )
+from xsigmamodules.Market import volatilityModelExtendedSvi
 from xsigmamodules.util.numpy_support import xsigmaToNumpy, numpyToXsigma
 from ipywidgets import interactive, FloatSlider, Button, HBox, VBox, Checkbox, Layout
 import ipywidgets as widgets
@@ -109,8 +110,8 @@ def plot_density(obj, strikes, spot, expiry):
         "strike2_sensitivity": np.zeros(n),
     }
 
-    obj.asv_with_sensitivities(
-        numpyToXsigma(strikes), *[numpyToXsigma(arr) for arr in arrays.values()], False
+    obj.sensitivities(
+        expiry, numpyToXsigma(strikes), *[numpyToXsigma(arr) for arr in arrays.values()]
     )
 
     density = [
@@ -140,9 +141,7 @@ def calculate_vols_and_density(
     strikes = np.linspace(0.5 * params["fwd"], 2.0 * params["fwd"], n)
 
     if model_type == "asv":
-        obj = analyticalSigmaVolatility(
-            params["time"],
-            forward,
+        obj = volatilityModelExtendedSvi(
             params["fwd"],
             params["ctrl_p"],
             params["ctrl_c"],
@@ -167,10 +166,10 @@ def calculate_vols_and_density(
             "strike2_sensitivity": np.zeros(n),
         }
 
-        obj.asv_with_sensitivities(
+        obj.sensitivities(
+            params["time"],
             numpyToXsigma(strikes),
             *[numpyToXsigma(arr) for arr in arrays.values()],
-            legacy_parametrisation,
         )
 
         vols = arrays["vols"]
