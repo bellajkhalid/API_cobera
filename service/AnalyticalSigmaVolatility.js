@@ -3,7 +3,7 @@
 const path = require('path');
 const { spawn } = require('child_process');
 
-const XSIGMA_PYTHON = process.env.XSIGMA_PYTHON || 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe';
+const XSIGMA_PYTHON = process.env.XSIGMA_PYTHON || 'C:/dev/build_ninja_avx2_python_sphinx/bin/xsigmapython.exe';
 const PYTHONPATH = process.env.PYTHONPATH || 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages';
 const XSIGMA_DATA_ROOT = process.env.XSIGMA_DATA_ROOT || 'C:/dev/build_ninja_avx2_python/ExternalData/Testing';
 

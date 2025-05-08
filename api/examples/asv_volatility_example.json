@@ -1,0 +1,17 @@
+{
+  "summary": "ASV Volatility Calculation",
+  "description": "Example request for ASV volatility model calibration",
+  "value": {
+    "computation_type": "volatility_asv",
+    "n": 200,
+    "fwd": 2245.0656,
+    "time": 1.0,
+    "ctrl_p": 0.2,
+    "ctrl_c": 0.2,
+    "atm": 1.1,
+    "skew": 3.5,
+    "smile": 0.5,
+    "put": 0.0384,
+    "call": 0.0001
+  }
+}

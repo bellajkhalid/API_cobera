@@ -4,9 +4,7 @@
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-
-const XSIGMA_PYTHON = 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe';
-const XSIGMA_SITE_PACKAGES = 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages';
+const { CONFIG, getPythonEnv } = require('./config');
 
 exports.getHjmCalibration = async function(req, res) {
   try {
@@ -32,29 +30,18 @@ exports.getHjmCalibration = async function(req, res) {
       throw error;
     }
 
-    // Set up environment variables
-    const env = {
-      ...process.env,
-      PYTHONPATH: [
-        XSIGMA_SITE_PACKAGES,
-        path.dirname(pythonScriptPath),
-        process.env.PYTHONPATH || ''
-      ].join(path.delimiter),
-      PYTHONUNBUFFERED: '1',
-      XSIGMA_DATA_ROOT: 'C:/dev/build_ninja_avx2_python/ExternalData/Testing'
-    };
-
     console.log('Executing with:');
-    console.log('XSigma Python Path:', XSIGMA_PYTHON);
+    console.log('XSigma Python Path:', CONFIG.PYTHON.EXECUTABLE);
     console.log('Script Path:', pythonScriptPath);
-    console.log('PYTHONPATH:', env.PYTHONPATH);
     console.log('Working Directory:', path.dirname(pythonScriptPath));
     console.log('Test Parameter:', test);
+
     // Increase timeout for test 2
-    const timeout = req.query.test === '2' ? 120000 : 30000;
-    // Create Python process
-    const pythonProcess = spawn(XSIGMA_PYTHON, [pythonScriptPath, test.toString()], {
-      env,
+    const timeout = req.query.test === '2' ? 120000 : CONFIG.PYTHON.TIMEOUT_MS;
+
+    // Create Python process using centralized configuration
+    const pythonProcess = spawn(CONFIG.PYTHON.EXECUTABLE, [pythonScriptPath, test.toString()], {
+      env: getPythonEnv(),
       cwd: path.dirname(pythonScriptPath),
       stdio: ['pipe', 'pipe', 'pipe']
     });

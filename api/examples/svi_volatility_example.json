@@ -1,0 +1,13 @@
+{
+  "summary": "SVI Volatility Calculation",
+  "description": "Example request for SVI volatility model calibration",
+  "value": {
+    "computation_type": "volatility_svi",
+    "n": 200,
+    "fwd": 1.0,
+    "time": 0.333,
+    "b": 0.1,
+    "m": 0.01,
+    "sigma": 0.4
+  }
+}

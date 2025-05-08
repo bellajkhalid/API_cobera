@@ -1,38 +1,42 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
-
-// Configuration constants
-const PYTHON_CONFIG = {
-  EXECUTABLE: process.platform === 'win32' 
-    ? 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe'
-    : '/usr/local/bin/xsigmapython',
-  SITE_PACKAGES: process.platform === 'win32'
-    ? 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages'
-    : '/usr/local/lib/python3.12/site-packages',
-  DATA_ROOT: process.platform === 'win32'
-    ? 'C:/dev/build_ninja_avx2_python/ExternalData/Testing'
-    : '/usr/local/share/xsigma/data',
-  TIMEOUT_MS: 30000
-};
+const { CONFIG, getPythonEnv } = require('./config');
 
 exports.getZabrCalibration = async function(req, res) {
   try {
     // Extract parameters from request with defaults
+    const {
+      N = 401,
+      forward = 0.02,
+      expiry = 30,
+      alpha = 0.00955,
+      beta = 0.956,
+      vol_of_vol = 0.373,
+      rho = -0.749,
+      shift = 0.0,
+      gamma = 1.0,
+      calibration_type = 'classical',
+      dt = 5.0,
+      nd = 3.5
+    } = req.query;
+
+    // Parse params and create object
     const params = {
-      N: parseInt(req.query.N || '401'),
-      forward: parseFloat(req.query.forward || '0.02'),
-      expiry: parseFloat(req.query.expiry || '30'),
-      alpha: parseFloat(req.query.alpha || '0.00955'),
-      beta: parseFloat(req.query.beta || '0.956'),
-      vol_of_vol: parseFloat(req.query.vol_of_vol || '0.373'),
-      rho: parseFloat(req.query.rho || '-0.749'),
-      shift: parseFloat(req.query.shift || '0.0'),
-      gamma: parseFloat(req.query.gamma || '1.0'),
-      dt: parseFloat(req.query.dt || '5.0'),
-      nd: parseFloat(req.query.nd || '3.5'),
-      calibration_type: req.query.calibration_type || 'classical'
+      N: parseInt(N),
+      forward: parseFloat(forward),
+      expiry: parseFloat(expiry),
+      alpha: parseFloat(alpha),
+      beta: parseFloat(beta),
+      vol_of_vol: parseFloat(vol_of_vol),
+      rho: parseFloat(rho),
+      shift: parseFloat(shift),
+      gamma: parseFloat(gamma),
+      calibration_type: calibration_type,
+      dt: parseFloat(dt),
+      nd: parseFloat(nd)
     };
 
     // Validate numeric parameters
@@ -44,7 +48,7 @@ exports.getZabrCalibration = async function(req, res) {
         });
       }
     }
-    
+
     // Additional parameter validation
     if (params.N <= 0) {
       return res.status(400).json({
@@ -76,60 +80,29 @@ exports.getZabrCalibration = async function(req, res) {
       });
     }
 
-    // Set up paths
-    const pythonScriptPath = path.join(__dirname, 'Python', 'zabr_calibration.py');
+    // Get absolute paths
+    const projectRoot = path.resolve(__dirname, '..');
+    const pythonScriptPath = path.join(projectRoot, 'service', 'Python', 'zabr_calibration.py');
+    
+    // Verify Python script exists
+    if (!fs.existsSync(pythonScriptPath)) {
+      console.error('Python script not found at:', pythonScriptPath);
+      throw new Error(`Python script not found at: ${pythonScriptPath}`);
+    }
 
-// Prepare command line arguments
-const args = [
-  pythonScriptPath,
-  params.forward.toString(),
-  params.expiry.toString(),
-  params.alpha.toString(),
-  params.beta.toString(),
-  params.vol_of_vol.toString(),
-  params.rho.toString(),
-  params.shift.toString(),
-  params.gamma.toString(),
-  params.calibration_type
-];
+    console.log('Executing zabr_calibration with parameters:', params);
+    console.log('Using Python executable:', CONFIG.PYTHON.EXECUTABLE);
 
-// Add PDE specific parameters if needed
-if (params.calibration_type === 'pde') {
-  args.push(params.dt.toString());
-  args.push(params.nd.toString());
-}
-
-// Log execution details
-console.log('Computing ZABR calibration with params:', params);
-console.log('[Configuration]', {
-  pythonExecutable: PYTHON_CONFIG.EXECUTABLE,
-  scriptPath: pythonScriptPath,
-  arguments: args,
-  workingDirectory: path.dirname(pythonScriptPath)
-});
-
-// Execute Python process
-const pythonProcess = spawn(PYTHON_CONFIG.EXECUTABLE, args, {
-  env: {
-    ...process.env,
-    PYTHONPATH: PYTHON_CONFIG.SITE_PACKAGES,
-    XSIGMA_DATA_ROOT: PYTHON_CONFIG.DATA_ROOT,
-    PYTHONUNBUFFERED: '1'
-  }
-});
-
-// Add more detailed logging for Python process errors
-pythonProcess.stderr.on('data', (data) => {
-  const str = data.toString();
-  console.error('[Python stderr]:', str);
-  errorString += str;
-  // Log the error in a structured format
-  console.error(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    error: str,
-    params: params
-  }));
-});
+    // Create Python process using centralized configuration
+    const pythonProcess = spawn(
+      CONFIG.PYTHON.EXECUTABLE, 
+      [pythonScriptPath, JSON.stringify(params)], 
+      {
+        env: getPythonEnv(),
+        cwd: path.dirname(pythonScriptPath),
+        stdio: ['pipe', 'pipe', 'pipe']
+      }
+    );
 
     let dataString = '';
     let errorString = '';
@@ -150,8 +123,8 @@ pythonProcess.stderr.on('data', (data) => {
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pythonProcess.kill();
-        reject(new Error(`Python process timed out after ${PYTHON_CONFIG.TIMEOUT_MS}ms`));
-      }, PYTHON_CONFIG.TIMEOUT_MS);
+        reject(new Error(`Python process timed out after ${CONFIG.PYTHON.TIMEOUT_MS}ms`));
+      }, CONFIG.PYTHON.TIMEOUT_MS);
 
       pythonProcess.on('close', (code) => {
         clearTimeout(timeout);

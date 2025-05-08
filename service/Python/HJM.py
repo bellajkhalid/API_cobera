@@ -23,14 +23,18 @@ from xsigmamodules.Analytics import (
     simulationManager,
     randomConfigId,
 )
+# Modified import to match Python 3.11 structure
 from xsigmamodules.Market import (
-    discountCurvePiecewiseConstant, 
-    irVolatilitySurface,
+    discountCurvePiecewiseConstant,  
     discountId,
     anyId,
     anyContainer,
     anyObject,
 )
+# Import irVolatilitySurface from another module if available
+# For now, we'll try to import it from Analytics
+from xsigmamodules.Analytics import irVolatilitySurface
+# Continue with existing imports
 from xsigmamodules.Util import dayCountConvention
 from xsigmamodules.Vectorization import vector, matrix, tensor
 from xsigmamodules.common import helper

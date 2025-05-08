@@ -3,9 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-
-const XSIGMA_PYTHON = 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe';
-const XSIGMA_SITE_PACKAGES = 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages';
+const { CONFIG, getPythonEnv } = require('./config');
 
 // Parameter validation rules
 const PARAM_RULES = {
@@ -57,31 +55,18 @@ exports.getVolatilityDataSvi = async function(req, res) {
       throw new Error(`Python script not found at: ${pythonScriptPath}`);
     }
 
-    // Set up environment variables
-    const env = {
-      ...process.env,
-      PYTHONPATH: [
-        XSIGMA_SITE_PACKAGES,
-        path.dirname(pythonScriptPath),
-        process.env.PYTHONPATH || ''
-      ].join(path.delimiter),
-      PYTHONUNBUFFERED: '1',
-      XSIGMA_DATA_ROOT: 'C:/dev/build_ninja_avx2_python/ExternalData/Testing'
-    };
-
     console.log('Executing with:', {
-      pythonPath: XSIGMA_PYTHON,
+      pythonPath: CONFIG.PYTHON.EXECUTABLE,
       scriptPath: pythonScriptPath,
-      pythonPathEnv: env.PYTHONPATH,
       params: params
     });
 
-    // Create Python process
+    // Create Python process using centralized configuration
     const pythonProcess = spawn(
-      XSIGMA_PYTHON, 
+      CONFIG.PYTHON.EXECUTABLE, 
       [pythonScriptPath, JSON.stringify(params)], 
       {
-        env,
+        env: getPythonEnv(),
         cwd: path.dirname(pythonScriptPath),
         stdio: ['pipe', 'pipe', 'pipe']
       }
@@ -141,11 +126,11 @@ exports.getVolatilityDataSvi = async function(req, res) {
         reject(new Error(`Failed to start Python process: ${error.message}`));
       });
 
-      // Set timeout
+      // Set timeout using CONFIG
       setTimeout(() => {
         pythonProcess.kill();
-        reject(new Error('Python process timed out after 30 seconds'));
-      }, 30000);
+        reject(new Error(`Python process timed out after ${CONFIG.PYTHON.TIMEOUT_MS / 1000} seconds`));
+      }, CONFIG.PYTHON.TIMEOUT_MS);
     });
 
   } catch (error) {

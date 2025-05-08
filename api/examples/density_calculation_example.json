@@ -1,0 +1,17 @@
+{
+  "summary": "Density Calculation",
+  "description": "Example request for probability density function calculation",
+  "value": {
+    "computation_type": "density",
+    "n": 200,
+    "fwd": 1.0,
+    "time": 0.5,
+    "ctrl_p": 0.2,
+    "ctrl_c": 0.2,
+    "atm": 0.2,
+    "skew": 0.1,
+    "smile": 0.05,
+    "put": 0.01,
+    "call": 0.01
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "summary": "Successful ASV Computation",
+  "description": "Example response for a successful ASV volatility calculation",
+  "value": {
+    "status": "success",
+    "data": {
+      "strikes": [2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500],
+      "volatilities": [0.25, 0.24, 0.23, 0.22, 0.21, 0.20, 0.21, 0.22, 0.23, 0.24, 0.25],
+      "densities": [0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.02, 0.01, 0.005, 0.002, 0.001]
+    },
+    "performance": {
+      "execution_time_ms": 125.45,
+      "python_execution_time_ms": 120.32,
+      "cache_hit": false
+    }
+  }
+}

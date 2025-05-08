@@ -3,9 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-
-const XSIGMA_PYTHON = 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe';
-const XSIGMA_SITE_PACKAGES = 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages';
+const { CONFIG, getPythonEnv } = require('./config');
 
 exports.getVolatilityData_classical = async function(req, res) {
   try {
@@ -130,31 +128,18 @@ async function executePythonScript(params, res) {
     throw createError(`Python script not found at: ${pythonScriptPath}`, 500);
   }
 
-  // Set up environment variables
-  const env = {
-    ...process.env,
-    PYTHONPATH: [
-      XSIGMA_SITE_PACKAGES,
-      path.dirname(pythonScriptPath),
-      process.env.PYTHONPATH || ''
-    ].join(path.delimiter),
-    PYTHONUNBUFFERED: '1',
-    XSIGMA_DATA_ROOT: 'C:/dev/build_ninja_avx2_python/ExternalData/Testing'
-  };
-
   console.log('Executing with:');
-  console.log('XSigma Python Path:', XSIGMA_PYTHON);
+  console.log('XSigma Python Path:', CONFIG.PYTHON.EXECUTABLE);
   console.log('Script Path:', pythonScriptPath);
-  console.log('PYTHONPATH:', env.PYTHONPATH);
   console.log('Working Directory:', path.dirname(pythonScriptPath));
   console.log('Parameters:', params);
 
-  // Create Python process
+  // Create Python process using the centralized configuration
   const pythonProcess = spawn(
-    XSIGMA_PYTHON, 
+    CONFIG.PYTHON.EXECUTABLE, 
     [pythonScriptPath, JSON.stringify(params)], 
     {
-      env,
+      env: getPythonEnv(),
       cwd: path.dirname(pythonScriptPath),
       stdio: ['pipe', 'pipe', 'pipe']
     }
@@ -193,11 +178,11 @@ async function executePythonScript(params, res) {
       reject(createError(`Failed to start XSigma Python process: ${error.message}`, 500));
     });
 
-    // Add timeout
+    // Add timeout using CONFIG
     setTimeout(() => {
       pythonProcess.kill();
-      reject(createError('Python process timed out after 30 seconds', 500));
-    }, 30000);
+      reject(createError(`Python process timed out after ${CONFIG.PYTHON.TIMEOUT_MS / 1000} seconds`, 504));
+    }, CONFIG.PYTHON.TIMEOUT_MS);
   });
 
   try {

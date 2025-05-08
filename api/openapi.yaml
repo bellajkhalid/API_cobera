@@ -1,24 +1,92 @@
 openapi: 3.0.0
 info:
-  title: Matrix Computation API
-  description: API to compute a matrix of double values from input parameters.
+  title: Xsigma Financial Models API
+  description: |
+    API for advanced financial modeling with volatility surfaces and interest rate models.
+
+    ## Available Models
+    - **SVI**: Stochastic Volatility Inspired models
+    - **ZABR**: Zero Correlation SABR models with various implementations
+    - **ASV**: Analytical Sigma Volatility models
+    - **HJM**: Heath-Jarrow-Morton interest rate models
+
+    ## Documentation
+    This API provides access to sophisticated financial calculations for options pricing, volatility surfaces, and interest rate modeling.
   version: 1.0.0
+  contact:
+    name: Xsigma Support
 servers:
-  - url: http://localhost:5000
+  - url: http://localhost:5001
     description: Local server
   - url: http://azakan.net:5000
     description: Remote server
+tags:
+  - name: Volatility Models - ASV
+    description: Analytical Sigma Volatility model endpoints
+  - name: Volatility Models - SVI
+    description: Stochastic Volatility Inspired model endpoints
+  - name: Volatility Models - ZABR
+    description: Zero Correlation SABR model with various implementations
+  - name: Interest Rate Models
+    description: HJM and Hull-White model implementations
+  - name: FX Models
+    description: FX models with stochastic rates
+  - name: Utility
+    description: Testing and utility endpoints
+
 paths:
   /AnalyticalSigmaVolatilityCalibration:
     post:
-      summary: Compute a matrix from input parameters
-      description: Takes various input parameters and returns computed values.
+      summary: Calibrate volatility models and compute volatility surfaces or density functions
+      description: |
+        Calibrates volatility models to market data and computes volatility surfaces or probability density functions.
+
+        ## Supported Computation Types
+        - **volatility_asv**: Analytical Sigma Volatility model calibration with implied volatilities
+        - **density**: Computes probability density functions based on calibrated model
+        - **volatility_svi**: Stochastic Volatility Inspired model calibration
       operationId: volatility_densityPOST
+      tags:
+        - Volatility Models - ASV
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AnalyticalSigmaVolatilityCalibration_Input'
+            examples:
+              asv:
+                value:
+                  computationType: "volatility_asv"
+                  n: 200
+                  spot: 2245.0656
+                  expiry: 1.0
+                  r: 0.003
+                  q: 0.0022
+                  beta: 0.4158
+                  rho: 0.2256
+                  volvol: 0.2256
+              density:
+                value:
+                  computationType: "density"
+                  n: 200
+                  spot: 2245.0656
+                  expiry: 1.0
+                  r: 0.003
+                  q: 0.0022
+                  beta: 0.4158
+                  rho: 0.2256
+                  volvol: 0.2256
+              svi:
+                value:
+                  computationType: "volatility_svi"
+                  n: 200
+                  spot: 2245.0656
+                  expiry: 1.0
+                  r: 0.003
+                  q: 0.0022
+                  beta: 0.4158
+                  rho: 0.2256
+                  volvol: 0.2256
         required: true
       responses:
         "200":
@@ -27,25 +95,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyticalSigmaVolatilityCalibration_Output'
+              examples:
+                success:
+                  value:
+                    status: "success"
+                    data:
+                      strikes: [1.8, 1.9, 2.0, 2.1, 2.2]
+                      volatilities: [0.235, 0.228, 0.221, 0.218, 0.223]
+                      densities: [0.05, 0.15, 0.6, 0.15, 0.05]
+                    performance:
+                      execution_time_ms: 125.3
+                      python_execution_time_ms: 98.7
+                      cache_hit: false
         "400":
-          description: Invalid input parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
         "500":
-          description: Internal server error or computation failure
+          $ref: '#/components/responses/InternalError'
+        "504":
+          description: Computation timed out
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-      x-swagger-router-controller: Default
-  
+                $ref: '#/components/schemas/EnhancedError'
+              examples:
+                timeout:
+                  value:
+                    status: "error"
+                    error: "Computation timed out"
+                    errorType: "TimeoutError"
+                    timestamp: "2023-05-15T14:33:21.123Z"
+                    details:
+                      code: "ETIMEDOUT"
+      x-swagger-router-controller: VolatilityASV
+
   /api/hjm:
     get:
       summary: Get HJM calibration results
       operationId: getHjmCalibration
-      x-swagger-router-controller: Default
+      tags:
+        - Interest Rate Models
+      x-swagger-router-controller: InterestRateModels
       parameters:
         - name: test
           in: query
@@ -57,42 +146,24 @@ paths:
             description: Test type (1, 2, or 3)
       responses:
         '200':
-          description: Successful operation
+          $ref: '#/components/responses/ArrayResponse'
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    enum: [success, error]
-                  data:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: number
-                  error:
-                    type: string
-                    nullable: true
+              examples:
+                success:
+                  $ref: './examples/hjm_example.json'
         '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
         '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/InternalError'
 
   /api/zabr_calibration:
     get:
       summary: Get ZABR calibration results
       operationId: getZabrCalibration
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - ZABR
+      x-swagger-router-controller: VolatilityZABR
       parameters:
         - name: N
           in: query
@@ -157,20 +228,6 @@ paths:
             type: number
             default: 1.0
             description: Gamma parameter
-        - name: dt
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 5.0
-            description: dt parameter
-        - name: nd
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 3.5
-            description: nd parameter
         - name: calibration_type
           in: query
           required: false
@@ -179,57 +236,35 @@ paths:
             enum: [classical, pde, mixture]
             default: classical
             description: Type of calibration to perform
+        - name: dt
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 5.0
+            description: Time step for PDE
+        - name: nd
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 3.5
+            description: Number of standard deviations
       responses:
         '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    enum: [success, error]
-                  data:
-                    type: object
-                    properties:
-                      strikes:
-                        type: array
-                        items:
-                          type: number
-                      model_vols:
-                        type: array
-                        items:
-                          type: number
-                      market_strikes:
-                        type: array
-                        items:
-                          type: number
-                      market_vols:
-                        type: array
-                        items:
-                          type: number
-                  error:
-                    type: string
-                    nullable: true
+          $ref: '#/components/responses/ZabrResponse'
         '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
         '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/InternalError'
 
   /api/zabr/classical:
     get:
       summary: Get Classical ZABR model results
       operationId: getVolatilityDataClassical
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - ZABR
+      x-swagger-router-controller: VolatilityZABR
       parameters:
         - name: expiry
           in: query
@@ -238,6 +273,7 @@ paths:
             type: number
             default: 10.0
             description: Time to expiry
+          example: 10.0
         - name: forward
           in: query
           required: false
@@ -245,6 +281,7 @@ paths:
             type: number
             default: 0.0325
             description: Forward price
+          example: 0.0325
         - name: alpha
           in: query
           required: false
@@ -252,6 +289,7 @@ paths:
             type: number
             default: 0.0873
             description: Alpha parameter
+          example: 0.0873
         - name: beta
           in: query
           required: false
@@ -259,6 +297,7 @@ paths:
             type: number
             default: 0.7
             description: Beta parameter
+          example: 0.7
         - name: nu
           in: query
           required: false
@@ -266,41 +305,23 @@ paths:
             type: number
             default: 0.47
             description: Nu parameter
+          example: 0.47
         - name: rho
           in: query
           required: false
           schema:
             type: number
-            default: -0.48
+            default: -0.1
             description: Correlation parameter
-        - name: shift
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 0.0
-            description: Shift parameter
-        - name: gamma
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 1.0
-            description: Gamma parameter
-        - name: use_vol_adjustement
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: true
-            description: Use volatility adjustment
+          example: -0.1
       responses:
         '200':
-          description: Successful operation
+          $ref: '#/components/responses/ZabrResponse'
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ZabrResponse'
+              examples:
+                success:
+                  $ref: './examples/zabr_classical_example.json'
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
@@ -310,7 +331,9 @@ paths:
     get:
       summary: Get Mixture ZABR model results
       operationId: getVolatilityDataMixture
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - ZABR
+      x-swagger-router-controller: VolatilityZABR
       parameters:
         - name: expiry
           in: query
@@ -352,78 +375,16 @@ paths:
           required: false
           schema:
             type: number
-            default: 0.2
-            description: D parameter
-        - name: nu
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 0.1978
-            description: Nu parameter
-        - name: rho
-          in: query
-          required: false
-          schema:
-            type: number
-            default: -0.444
-            description: Correlation parameter
-        - name: gamma
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 1.0
-            description: Gamma parameter
-        - name: use_vol_adjustement
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: true
-            description: Use volatility adjustment
-        - name: high_strike
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 0.1
-            description: High strike threshold
-        - name: vol_low
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 0.0001
-            description: Low volatility threshold
-        - name: low_strike
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 0.02
-            description: Low strike threshold
-        - name: forward_cut_off
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 0.02
-            description: Forward cut-off value
-        - name: smothing_factor
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 0.001
-            description: Smoothing factor
+            default: 0.5
+            description: Mixture parameter
       responses:
         '200':
-          description: Successful operation
+          $ref: '#/components/responses/ZabrResponse'
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ZabrResponse'
+              examples:
+                success:
+                  $ref: './examples/zabr_mixture_example.json'
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
@@ -433,7 +394,9 @@ paths:
     get:
       summary: Get PDE SABR model results
       operationId: getVolatilityDataPde
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - ZABR
+      x-swagger-router-controller: VolatilityZABR
       parameters:
         - name: expiry
           in: query
@@ -490,7 +453,7 @@ paths:
           schema:
             type: integer
             default: 100
-            description: Grid points
+            description: Grid size
         - name: timesteps
           in: query
           required: false
@@ -504,14 +467,15 @@ paths:
           schema:
             type: integer
             default: 5
-            description: Number of nd parameter
+            description: Number of standard deviations
       responses:
         '200':
-          description: Successful operation
+          $ref: '#/components/responses/ZabrResponse'
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ZabrResponse'
+              examples:
+                success:
+                  $ref: './examples/zabr_pde_example.json'
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
@@ -521,7 +485,9 @@ paths:
     get:
       summary: Get HJM calibration results with lognormal FX rates
       operationId: LognormalFXWithMHJMRates
-      x-swagger-router-controller: Default
+      tags:
+        - FX Models
+      x-swagger-router-controller: FXModels
       parameters:
         - name: num_paths
           in: query
@@ -539,187 +505,97 @@ paths:
             description: Initial volatility parameter
       responses:
         '200':
-          description: Successful operation
+          $ref: '#/components/responses/FXModelResponse'
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    enum: [success, error]
-                  data:
-                    type: object
-                    properties:
-                      strikes:
-                        type: array
-                        items:
-                          type: number
-                      model_volatility:
-                        type: array
-                        items:
-                          type: number
-                      market_volatility:
-                        type: array
-                        items:
-                          type: number
-                      results_money_market:
-                        type: array
-                        items:
-                          type: number
-                      results_discount_factors:
-                        type: array
-                        items:
-                          type: number
-                  error:
-                    type: string
-                    nullable: true
+              examples:
+                success:
+                  $ref: './examples/fx_mhjm_example.json'
         '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
         '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/InternalError'
 
   /api/analytical-sigma-volatility:
     get:
       summary: Get analytical sigma volatility calculations
       operationId: getAnalyticalSigmaVolatility
-      x-swagger-router-controller: Default
-      parameters:
-        - name: n
-          in: query
-          schema:
-            type: integer
-            default: 200
-        - name: fwd
-          in: query
-          schema:
-            type: number
-            default: 2245.0656707892695  # Default for Test = 1
-        - name: time
-          in: query
-          schema:
-            type: number
-            default: 1.0  # Default for Test = 1
-        - name: ctrl_p
-          in: query
-          schema:
-            type: number
-            default: 0.2
-        - name: ctrl_c
-          in: query
-          schema:
-            type: number
-            default: 0.2
-        - name: atm
-          in: query
-          schema:
-            type: number
-            default: 1.1  # Default for Test = 1
-        - name: skew
-          in: query
-          schema:
-            type: number
-            default: 3.5  # Default for Test = 1
-        - name: smile
-          in: query
-          schema:
-            type: number
-            default: 17  # Default for Test = 1
-        - name: put
-          in: query
-          schema:
-            type: number
-            default: 0.7  # Default for Test = 1
-        - name: call
-          in: query
-          schema:
-            type: number
-            default: 0.06  # Default for Test = 1
-        - name: Test
-          in: query
-          schema:
-            type: integer
-            default: 1
-            description: |
-              Test case selector:
-              1: High values case
-              2-4: Standard values (fwd=1.0, time=0.333, atm=0.1929, skew=0.02268, 
-                 smile=0.00317, put=-0.00213, call=-0.00006)
-      responses:
-        '200':
-          $ref: '#/components/schemas/AnalyticalSigmaVolatilityResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /api/hartman_watson_distribution:
-    get:
-      summary: Get Hartman-Watson distribution calculations
-      operationId: getHartmanWatsonDistribution
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - ASV
+      x-swagger-router-controller: VolatilityASV
       parameters:
         - name: n
           in: query
           required: false
           schema:
             type: integer
-            default: 64
-            description: Number of points for calculation
-        - name: t
+            default: 200
+            description: Number of points
+        - name: fwd
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 2245.0656707892695
+            description: Forward price
+        - name: time
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 1.0
+            description: Time to expiry
+        - name: ctrl_p
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.2
+            description: Control point for put side
+        - name: ctrl_c
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.2
+            description: Control point for call side
+        - name: atm
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 1.1
+            description: At-the-money volatility
+        - name: skew
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 3.5
+            description: Skew parameter
+        - name: smile
           in: query
           required: false
           schema:
             type: number
             default: 0.5
-            description: Time parameter
-        - name: size_roots
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 32
-            description: Number of roots for Gaussian quadrature
-        - name: x_0
-          in: query
-          required: false
-          schema:
-            type: number
-            default: -5
-            description: Lower bound of x range
-        - name: x_n
-          in: query
-          required: false
-          schema:
-            type: number
-            default: 3.1
-            description: Upper bound of x range
+            description: Smile parameter
       responses:
         '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HartmanWatsonResponse'
+          $ref: '#/components/responses/VolatilityResponse'
         '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /test:
     get:
       summary: Retrieve test data
       description: Returns a predefined array of JSON objects for testing purposes.
       operationId: testGET
+      tags:
+        - Utility
+      x-swagger-router-controller: Utility
       responses:
         "200":
           description: Successful retrieval of test data
@@ -729,174 +605,205 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AnalyticalSigmaVolatilityCalibration_Output'
-      x-swagger-router-controller: Default
 
   /api/volatility_asv:
     get:
       summary: Get ASV volatility smile and density data
+      description: |
+        Returns volatility smile and density data for the Analytical Sigma Volatility model.
+
+        ## Example URL
+        `/api/volatility_asv?fwd=1.0&time=0.333&atm=0.1929&skew=0.02268&smile=0.003&put=0.0384&call=0.0001`
       operationId: getVolatilityAsv
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - ASV
+      x-swagger-router-controller: VolatilityASV
       parameters:
         - name: fwd
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 1.0
             description: Forward price
+          example: 1.0
         - name: time
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.333
             description: Time to expiry
+          example: 0.333
         - name: ctrl_p
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.2
             description: Control point for put side
+          example: 0.2
         - name: ctrl_c
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.2
             description: Control point for call side
+          example: 0.2
         - name: atm
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.1929
             description: At-the-money volatility
+          example: 0.1929
         - name: skew
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.02268
             description: Skew parameter
+          example: 0.02268
         - name: smile
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.003
             description: Smile parameter
+          example: 0.003
         - name: put
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.0384
             description: Put wing parameter
+          example: 0.0384
         - name: call
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.0001
             description: Call wing parameter
+          example: 0.0001
       responses:
         '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VolatilityResponse'
+          $ref: '#/components/responses/VolatilityResponse'
         '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
         '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'  
+          $ref: '#/components/responses/InternalError'
     post:
       summary: Calculate ASV volatility model data
+      description: |
+        Calculates volatility smile and density data for the Analytical Sigma Volatility model.
+
+        ## Example Request
+        ```json
+        {
+          "fwd": 1.0,
+          "time": 0.333,
+          "ctrl_p": 0.2,
+          "ctrl_c": 0.2,
+          "atm": 0.1929,
+          "skew": 0.02268,
+          "smile": 0.003,
+          "put": 0.0384,
+          "call": 0.0001
+        }
+        ```
       operationId: postVolatilityAsv
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - ASV
+      x-swagger-router-controller: VolatilityASV
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AsvVolatilityRequest'
+            example:
+              fwd: 1.0
+              time: 0.333
+              ctrl_p: 0.2
+              ctrl_c: 0.2
+              atm: 0.1929
+              skew: 0.02268
+              smile: 0.003
+              put: 0.0384
+              call: 0.0001
       responses:
         '200':
-          description: Successful operation
+          $ref: '#/components/responses/VolatilityResponse'
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/VolatilityResponse'
+              example:
+                status: success
+                data:
+                  strikes: [0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2]
+                  volatilities: [0.22, 0.21, 0.20, 0.195, 0.193, 0.195, 0.20, 0.21, 0.22]
+                  densities: [0.01, 0.05, 0.1, 0.2, 0.3, 0.2, 0.1, 0.05, 0.01]
+                  parameters: {
+                    "fwd": 1.0,
+                    "time": 0.333,
+                    "atm": 0.1929
+                  }
         '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
         '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/InternalError'
 
   /api/volatility_svi:
     get:
       summary: Get SVI volatility smile and density data
-      operationId: getVolatilitySvi  
-      x-swagger-router-controller: Default
+      operationId: getVolatilitySvi
+      tags:
+        - Volatility Models - SVI
+      x-swagger-router-controller: VolatilitySVI
       parameters:
         - name: fwd
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 1.0
             description: Forward price
         - name: time
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.333
             description: Time to expiry
         - name: b
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.1
             description: SVI b parameter
         - name: m
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.01
             description: SVI m parameter
         - name: sigma
           in: query
-          required: true
+          required: false
           schema:
             type: number
             default: 0.4
             description: SVI sigma parameter
       responses:
         '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VolatilityResponse'
+          $ref: '#/components/responses/VolatilityResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
@@ -904,7 +811,9 @@ paths:
     post:
       summary: Calculate SVI volatility model data
       operationId: postVolatilitySvi
-      x-swagger-router-controller: Default
+      tags:
+        - Volatility Models - SVI
+      x-swagger-router-controller: VolatilitySVI
       requestBody:
         required: true
         content:
@@ -913,20 +822,117 @@ paths:
               $ref: '#/components/schemas/SviVolatilityRequest'
       responses:
         '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VolatilityResponse'
+          $ref: '#/components/responses/VolatilityResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
           $ref: '#/components/responses/InternalError'
+
 components:
   schemas:
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [error]
+        error:
+          type: string
+        errorType:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - status
+        - error
+
+    EnhancedError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            details:
+              type: object
+              additionalProperties: true
+            code:
+              type: string
+
+    StandardResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        data:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - status
+
     AnalyticalSigmaVolatilityCalibration_Input:
       type: object
+      properties:
+        computationType:
+          type: string
+          enum: [volatility_asv, density, volatility_svi]
+          description: Type of computation to perform
+          example: volatility_asv
+        n:
+          type: integer
+          minimum: 10
+          maximum: 10000
+          default: 200
+          description: Number of points for calculation
+          example: 200
+        spot:
+          type: number
+          minimum: 0.001
+          description: Spot price
+          example: 2245.0656
+        expiry:
+          type: number
+          minimum: 0.001
+          maximum: 100
+          description: Time to expiry in years
+          example: 1.0
+        r:
+          type: number
+          minimum: -0.10
+          maximum: 0.50
+          description: Risk-free interest rate
+          example: 0.003
+        q:
+          type: number
+          minimum: -0.10
+          maximum: 0.50
+          description: Dividend yield
+          example: 0.0022
+        beta:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Beta parameter
+          example: 0.4158
+        rho:
+          type: number
+          minimum: -1
+          maximum: 1
+          description: Correlation parameter
+          example: 0.2256
+        volvol:
+          type: number
+          minimum: 0.001
+          description: Volatility of volatility
+          example: 0.2256
       required:
+        - computationType
         - n
         - spot
         - expiry
@@ -935,67 +941,16 @@ components:
         - beta
         - rho
         - volvol
-        - computationType
-      properties:
-        n:
-          type: integer
-          description: Number of points
-          minimum: 1
-          example: 400
-        spot:
-          type: number
-          format: double
-          description: Spot price
-          minimum: 0
-          exclusiveMinimum: true
-          example: 2273.684211
-        expiry:
-          type: number
-          format: double
-          description: Time to expiry in years
-          minimum: 0
-          exclusiveMinimum: true
-          example: 1.0
-        r:
-          type: number
-          format: double
-          description: Risk-free interest rate
-          example: 0.003
-        q:
-          type: number
-          format: double
-          description: Dividend yield
-          minimum: 0
-          example: 0.0022
-        beta:
-          type: number
-          format: double
-          description: Beta parameter
-          minimum: 0
-          maximum: 1
-          example: 0.4158
-        rho:
-          type: number
-          format: double
-          description: Correlation parameter
-          minimum: -1
-          maximum: 1
-          example: 0.2256
-        volvol:
-          type: number
-          format: double
-          description: Volatility of volatility
-          minimum: 0
-          exclusiveMinimum: true
-          example: 0.2256
-        computationType:
-          type: string
-          description: Type of computation to perform
-          enum:
-            - volatility_asv
-            - density
-            - volatility_svi
-          example: volatility_asv
+      example:
+        computationType: volatility_asv
+        n: 200
+        spot: 2245.0656
+        expiry: 1.0
+        r: 0.003
+        q: 0.0022
+        beta: 0.4158
+        rho: 0.2256
+        volvol: 0.2256
 
     AnalyticalSigmaVolatilityCalibration_Output:
       type: object
@@ -1003,37 +958,6 @@ components:
         status:
           type: string
           enum: [success, error]
-          description: Operation status
-        data:
-          type: array
-          items:
-            type: object
-            properties:
-              key:
-                type: number
-                format: double
-                description: Input value (e.g., strike price)
-              value:
-                type: number
-                format: double
-                description: Computed result
-            required:
-              - key
-              - value
-        error:
-          type: string
-          nullable: true
-          description: Error message if status is error
-      required:
-        - status
-
-    AnalyticalSigmaVolatilityResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [success, error]
-          description: Operation status
         data:
           type: object
           properties:
@@ -1041,210 +965,129 @@ components:
               type: array
               items:
                 type: number
-              description: Array of strike prices
-            vols:
+            volatilities:
               type: array
               items:
                 type: number
-              description: Array of volatilities
-            vols_origin:
+            densities:
               type: array
               items:
                 type: number
-              description: Array of origin volatilities
         error:
           type: string
           nullable: true
-          description: Error message if status is error
-
-    HartmanWatsonResponse:
-      type: object
+        performance:
+          type: object
+          properties:
+            execution_time_ms:
+              type: number
+            python_execution_time_ms:
+              type: number
+            cache_hit:
+              type: boolean
       required:
         - status
-        - data
-        - error
-      properties:
-        status:
-          type: string
-          enum: [success, error]
-          description: Operation status
-        data:
-          type: object
-          required:
-            - x_values
-            - distribution
-          properties:
-            x_values:
-              type: array
-              items:
-                type: number
-              description: Array of x values for the distribution
-            distribution:
-              type: array
-              items:
-                type: number
-              description: Array of distribution values
-        error:
-          type: string
-          nullable: true
-          description: Error message if any
-
-    VolatilityResponse:
-      type: object
-      required: [status, data]
-      properties:
-        status:
-          type: string
-          enum: [success, error]
-          description: Operation status
-        data:
-          type: object
-          required: [initial, current]
-          properties:
-            initial:
-              $ref: '#/components/schemas/VolatilityData'
-            current:
-              $ref: '#/components/schemas/VolatilityData'
-        error:
-          type: string
-          nullable: true
-          description: Error message if status is error
-
-    VolatilityData:
-      type: object
-      required: [strikes, vols, density]
-      properties:
-        strikes:
-          type: array
-          items:
-            type: number
-          description: Array of strike prices
-        vols:
-          type: array
-          items:
-            type: number
-          description: Array of volatilities
-        density:
-          type: array
-          items:
-            type: number
-          description: Array of probability densities
 
     AsvVolatilityRequest:
       type: object
-      required: [fwd, time, ctrl_p, ctrl_c, atm, skew, smile, put, call]
       properties:
         fwd:
           type: number
           default: 1.0
           description: Forward price
+          example: 1.0
         time:
           type: number
           default: 0.333
           description: Time to expiry
+          example: 0.333
         ctrl_p:
           type: number
           default: 0.2
           description: Control point for put side
+          example: 0.2
         ctrl_c:
           type: number
           default: 0.2
           description: Control point for call side
+          example: 0.2
         atm:
           type: number
           default: 0.1929
           description: At-the-money volatility
+          example: 0.1929
         skew:
           type: number
           default: 0.02268
           description: Skew parameter
+          example: 0.02268
         smile:
           type: number
           default: 0.003
           description: Smile parameter
+          example: 0.003
         put:
           type: number
           default: 0.0384
           description: Put wing parameter
+          example: 0.0384
         call:
           type: number
           default: 0.0001
           description: Call wing parameter
-    
+          example: 0.0001
+      required:
+        - fwd
+        - time
+      example:
+        fwd: 1.0
+        time: 0.333
+        ctrl_p: 0.2
+        ctrl_c: 0.2
+        atm: 0.1929
+        skew: 0.02268
+        smile: 0.003
+        put: 0.0384
+        call: 0.0001
+
     SviVolatilityRequest:
       type: object
-      required: [fwd, time, b, m, sigma]
       properties:
         fwd:
           type: number
           default: 1.0
           description: Forward price
+          example: 1.0
         time:
           type: number
           default: 0.333
           description: Time to expiry
+          example: 0.333
         b:
           type: number
           default: 0.1
           description: SVI b parameter
+          example: 0.1
         m:
           type: number
           default: 0.01
           description: SVI m parameter
+          example: 0.01
         sigma:
           type: number
           default: 0.4
           description: SVI sigma parameter
-
-    ZabrVolatilityData:
-      type: object
-      required: [strikes, vols]
-      properties:
-        strikes:
-          type: array
-          items:
-            type: number
-          description: Array of strike prices
-        vols:
-          type: array
-          items:
-            type: number
-          description: Array of volatilities
-
-    ZabrResponse:
-      type: object
-      required: [status, data]
-      properties:
-        status:
-          type: string
-          enum: [success, error]
-        data:
-          type: object
-          required: [initial, current]
-          properties:
-            initial:
-              $ref: '#/components/schemas/ZabrVolatilityData'
-            current:
-              $ref: '#/components/schemas/ZabrVolatilityData'
-    
-    Error:
-      type: object
+          example: 0.4
       required:
-        - status
-        - error
-      properties:
-        status:
-          type: string
-          enum: [error]
-          description: Error status indicator
-        error:
-          type: string
-          description: Detailed error message
-        timestamp:
-          type: string
-          format: date-time
-          description: Timestamp of when the error occurred
-    
+        - fwd
+        - time
+      example:
+        fwd: 1.0
+        time: 0.333
+        b: 0.1
+        m: 0.01
+        sigma: 0.4
+
   responses:
     BadRequest:
       description: Invalid input
@@ -1258,5 +1101,104 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-
-    
+    ArrayResponse:
+      description: Successful operation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [success, error]
+              data:
+                type: array
+                items:
+                  type: array
+                  items:
+                    type: number
+              error:
+                type: string
+                nullable: true
+    FXModelResponse:
+      description: Successful operation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [success, error]
+              data:
+                type: object
+                properties:
+                  strikes:
+                    type: array
+                    items:
+                      type: number
+                  model_volatility:
+                    type: array
+                    items:
+                      type: number
+              error:
+                type: string
+                nullable: true
+    ZabrResponse:
+      description: Successful operation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [success, error]
+              data:
+                type: object
+                properties:
+                  strikes:
+                    type: array
+                    items:
+                      type: number
+                  volatilities:
+                    type: array
+                    items:
+                      type: number
+                  parameters:
+                    type: object
+                    additionalProperties: true
+              error:
+                type: string
+                nullable: true
+    VolatilityResponse:
+      description: Successful operation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [success, error]
+              data:
+                type: object
+                properties:
+                  strikes:
+                    type: array
+                    items:
+                      type: number
+                  volatilities:
+                    type: array
+                    items:
+                      type: number
+                  densities:
+                    type: array
+                    items:
+                      type: number
+                  parameters:
+                    type: object
+                    additionalProperties: true
+              error:
+                type: string
+                nullable: true

@@ -1,0 +1,18 @@
+{
+  "summary": "Computation Timeout Error",
+  "description": "Example of a timeout error response",
+  "value": {
+    "status": "error",
+    "error": "Computation timed out after 30 seconds",
+    "errorType": "TimeoutError",
+    "timestamp": "2023-06-15T14:32:21.123Z",
+    "details": {
+      "computation_type": "volatility_asv",
+      "parameters": {
+        "n": 10000,
+        "fwd": 2245.0656
+      }
+    },
+    "code": "TIMEOUT_ERROR"
+  }
+}

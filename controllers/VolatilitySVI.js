@@ -1,15 +1,21 @@
 'use strict';
 
 const utils = require('../utils/writer.js');
-const AnalyticalSigmaVolatilityCalibration = require('../service/AnalyticalSigmaVolatilityCalibration.js');
-const AnalyticalSigmaVolatility = require('../service/AnalyticalSigmaVolatility.js');
-const HartmanWatsonDistribution = require('../service/HW_distribution.js');
-const HjmCalibration = require('../service/hjm.js');
-const MHJMRates = require('../service/LognormalFXWithMHJMRate.js');
-const ZabrCalibration = require('../service/zabr_calibration.js');
 const VolatilitySvi = require('../service/volatility_svi.js');
-const VolatilityAsv = require('../service/volatility_asv.js');
-const ZabrAnalytics = require('../service/zabr_analytics.js');
+
+/**
+ * Generic error handler for all controller methods
+ */
+const handleError = (error, res) => {
+  console.error('Controller error:', error);
+  const status = error.status || 500;
+  const errorResponse = {
+    status: 'error',
+    error: error.message || 'Internal Server Error',
+    timestamp: new Date().toISOString()
+  };
+  return utils.writeJson(res, errorResponse, status);
+};
 
 /**
  * Controller for SVI volatility GET endpoint

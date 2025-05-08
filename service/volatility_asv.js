@@ -3,36 +3,21 @@
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-
-const XSIGMA_PYTHON = 'C:/dev/build_ninja_avx2_python/bin/xsigmapython.exe';
-const XSIGMA_SITE_PACKAGES = 'C:/dev/build_ninja_avx2_python/lib/python3.12/site-packages';
+const { CONFIG, getPythonEnv } = require('./config');
 
 exports.getVolatilityData_asv = async function(req, res) {
   try {
     // Extract parameters from request
-    const {
-      fwd = 1.0,
-      time = 0.333,
-      ctrl_p = 0.2,
-      ctrl_c = 0.2,
-      atm = 0.1929,
-      skew = 0.02268,
-      smile = 0.003,
-      put = 0.0384,
-      call = 0.0001
-    } = req.query;
-
-    // Validate parameters
     const params = {
-      fwd: parseFloat(fwd),
-      time: parseFloat(time),
-      ctrl_p: parseFloat(ctrl_p),
-      ctrl_c: parseFloat(ctrl_c),
-      atm: parseFloat(atm),
-      skew: parseFloat(skew),
-      smile: parseFloat(smile),
-      put: parseFloat(put),
-      call: parseFloat(call)
+      fwd: parseFloat(req.query.fwd || 1.0),
+      time: parseFloat(req.query.time || 0.333),
+      ctrl_p: parseFloat(req.query.ctrl_p || 0.2),
+      ctrl_c: parseFloat(req.query.ctrl_c || 0.2),
+      atm: parseFloat(req.query.atm || 0.1929),
+      skew: parseFloat(req.query.skew || 0.02268),
+      smile: parseFloat(req.query.smile || 0.003),
+      put: parseFloat(req.query.put || 0.0384),
+      call: parseFloat(req.query.call || 0.0001)
     };
 
     // Get absolute paths
@@ -47,31 +32,17 @@ exports.getVolatilityData_asv = async function(req, res) {
       throw error;
     }
 
-    // Set up environment variables
-    const env = {
-      ...process.env,
-      PYTHONPATH: [
-        XSIGMA_SITE_PACKAGES,
-        path.dirname(pythonScriptPath),
-        process.env.PYTHONPATH || ''
-      ].join(path.delimiter),
-      PYTHONUNBUFFERED: '1',
-      XSIGMA_DATA_ROOT: 'C:/dev/build_ninja_avx2_python/ExternalData/Testing'
-    };
-
-    console.log('Executing with:');
-    console.log('XSigma Python Path:', XSIGMA_PYTHON);
+    console.log('Executing volatility_asv with:');
+    console.log('XSigma Python Path:', CONFIG.PYTHON.EXECUTABLE);
     console.log('Script Path:', pythonScriptPath);
-    console.log('PYTHONPATH:', env.PYTHONPATH);
-    console.log('Working Directory:', path.dirname(pythonScriptPath));
     console.log('Parameters:', params);
 
-    // Create Python process
+    // Create Python process using centralized configuration
     const pythonProcess = spawn(
-      XSIGMA_PYTHON, 
+      CONFIG.PYTHON.EXECUTABLE, 
       [pythonScriptPath, JSON.stringify(params)], 
       {
-        env,
+        env: getPythonEnv(),
         cwd: path.dirname(pythonScriptPath),
         stdio: ['pipe', 'pipe', 'pipe']
       }
