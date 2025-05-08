@@ -46,7 +46,6 @@ app.use(swaggerApp);
 http.createServer(app).listen(serverPort, Host, function () {
     console.log('Your server is listening on port %d', serverPort);
     console.log('Swagger-ui is available on http://%s:%d/docs', Host, serverPort);
-    console.log('Main application: http://%s:%d/docs', Host, serverPort);
-    console.log('SVI Visualization: http://%s:%d/svi', Host, serverPort);
-    console.log('ZABR Visualization: http://%s:%d/zabr', Host, serverPort);
+    console.log('Testing: SVI Visualization: http://%s:%d/svi', Host, serverPort);
+    console.log('Testing: ZABR Visualization: http://%s:%d/zabr', Host, serverPort);
 });
